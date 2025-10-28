@@ -1,0 +1,29 @@
+// =========================
+// File: Code.gs  (Apps Script)
+// =========================
+const APP_TITLE = 'ระบบบริหารข้อมูลนักเรียน';
+
+/**
+ * Serves the web app UI.
+ * Ensure your HTML file name is exactly 'index' (lowercase) in the Apps Script project.
+ */
+function doGet(e) {
+  var htmlOutput = HtmlService.createHtmlOutputFromFile('index')
+    .setTitle(APP_TITLE)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  // NOTE: Do not use addMetaTag here — some meta are not allowed in this context and will throw.
+  // Put meta tags in <head> of index.html instead (viewport, theme-color, etc.).
+  return htmlOutput;
+}
+
+/**
+ * Allow including partial HTML files from index.html with <?= include('partialName') ?>
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/** Simple health check from client: google.script.run.withSuccessHandler(...).ping() */
+function ping() {
+  return { ok: true, time: new Date().toISOString() };
+}
