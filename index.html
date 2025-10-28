@@ -75,18 +75,32 @@
     <div id="attendance-tab" class="tab-content active">
       <div class="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 class="text-xl font-bold mb-4 text-blue-800">เช็คชื่อนักเรียน</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 mb-6">
           <div>
-            <label class="block text-gray-700 mb-2">เลือกห้องเรียน:</label>
-            <div id="attendance-room-buttons" class="flex flex-wrap gap-2">
-              <p class="text-gray-500">กำลังโหลดห้องเรียน...</p>
-            </div>
+            <label class="block text-gray-700 mb-2">ภาคเรียน:</label>
+            <select id="attendance-semester" class="w-full px-4 py-2 border rounded">
+              <option value="">เลือกภาคเรียน</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
           </div>
           <div>
-            <label class="block text-gray-700 mb-2">เลือกรายวิชา (ภาคเรียนปัจจุบัน):</label>
-            <div id="attendance-subject-buttons" class="flex flex-wrap gap-2">
-              <p class="text-gray-500">กำลังโหลดรายวิชา...</p>
-            </div>
+            <label class="block text-gray-700 mb-2">ปีการศึกษา (พ.ศ.):</label>
+            <select id="attendance-year" class="w-full px-4 py-2 border rounded">
+              <option value="">เลือกปีการศึกษา</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-gray-700 mb-2">เลือกรายวิชา:</label>
+            <select id="attendance-subject" class="w-full px-4 py-2 border rounded" disabled>
+              <option value="">กรุณาเลือกภาคเรียนและปีการศึกษาก่อน</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-gray-700 mb-2">เลือกห้องเรียน:</label>
+            <select id="attendance-room" class="w-full px-4 py-2 border rounded" disabled>
+              <option value="">กรุณาเลือกรายวิชาก่อน</option>
+            </select>
           </div>
         </div>
         <div class="mb-6"><label class="block text-gray-700 mb-2">วันที่:</label><input type="date" id="attendance-date" class="px-4 py-2 border rounded" value=""></div>
@@ -127,7 +141,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-gray-700 mb-2">รายวิชา (ภาคเรียนปัจจุบัน):</label>
+            <label class="block text-gray-700 mb-2">รายวิชา:</label>
             <select id="summary-subject" class="w-full px-4 py-2 border rounded">
               <option value="">เลือกรายวิชา</option>
             </select>
@@ -312,7 +326,7 @@
             <input type="text" id="subject-name" class="w-full px-4 py-2 border rounded" required>
           </div>
 
-          <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label class="block text-gray-700 mb-1">ภาคเรียน:</label>
               <!-- เปลี่ยนเป็น select (1/2 เท่านั้น) -->
@@ -325,12 +339,12 @@
               <label class="block text-gray-700 mb-1">ปีการศึกษา (พ.ศ.):</label>
               <input type="number" id="subject-yearbe" class="w-full px-4 py-2 border rounded" value="2568" required>
             </div>
-            <div class="flex items-end">
-              <label class="flex items-center gap-2">
-                <input type="checkbox" id="subject-active-this-term" class="h-4 w-4" checked>
-                เปิดใช้ภาคเรียนนี้
-              </label>
-            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-gray-700 mb-1">ห้องเรียนที่สอน (คั่นด้วยเครื่องหมาย ,):</label>
+            <input type="text" id="subject-rooms" class="w-full px-4 py-2 border rounded" placeholder="เช่น ม.5/1, ม.5/2">
+            <p class="text-xs text-gray-500 mt-1">ระบุชื่อห้องเรียนที่เปิดสอนวิชานี้ สามารถระบุได้หลายห้อง</p>
           </div>
 
           <div class="flex justify-end gap-2">
@@ -412,8 +426,7 @@ function isSubjectInCurrentTerm(subj) {
   // Fallback เมื่อวิชาเก่ายังไม่มีค่า
   const sem = Number(subj.semester ?? CURRENT_SEMESTER);
   const yr  = Number(subj.yearBE  ?? CURRENT_YEAR_BE);
-  const active = (subj.activeThisTerm !== false);
-  return sem === CURRENT_SEMESTER && yr === CURRENT_YEAR_BE && active;
+  return sem === CURRENT_SEMESTER && yr === CURRENT_YEAR_BE;
 }
 
 // Constants for new attendance logic
@@ -463,7 +476,7 @@ async function handleEditSubjectModal(event) {
   await waitForAuth(); const subjectKey = event.target.dataset.key; database.ref(`subjects/${subjectKey}`).once('value') .then(snapshot => { if (snapshot.exists()) { const data = snapshot.val(); document.getElementById('subject-firebase-key-edit').value = subjectKey; document.getElementById('subject-code').value = data.code || ''; document.getElementById('subject-name').value = data.name || '';
   document.getElementById('subject-semester').value = (data.semester === 1 || data.semester === 2) ? data.semester : CURRENT_SEMESTER;
   document.getElementById('subject-yearbe').value  = Number.isFinite(Number(data.yearBE)) ? data.yearBE : CURRENT_YEAR_BE;
-  document.getElementById('subject-active-this-term').checked = (data.activeThisTerm !== false);
+  document.getElementById('subject-rooms').value = normalizeRooms(data.rooms).join(', ');
   document.getElementById('add-subject-modal').classList.remove('hidden'); } else { Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลรายวิชาที่ต้องการแก้ไข', 'error'); } }) .catch(err => { Swal.fire('ผิดพลาดโหลดข้อมูลรายวิชา', `ไม่สามารถโหลดข้อมูลรายวิชาเพื่อแก้ไข: ${err.message}`, 'error'); });}
 async function handleDeleteSubject(event) {
   await waitForAuth(); const subjectKey = event.target.dataset.key; const subjectName = event.target.dataset.name || "ไม่ทราบชื่อ"; Swal.fire({ title: 'ยืนยันการลบ', text: `คุณต้องการลบรายวิชา "${subjectName}" ใช่หรือไม่? (ข้อมูลการเช็คชื่อของวิชานี้จะไม่ถูกลบไปด้วย)`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'ใช่, ลบข้อมูล', cancelButtonText: 'ยกเลิก' }).then(result => { if (result.isConfirmed) { database.ref(`subjects/${subjectKey}`).remove().then(() => { Swal.fire('ลบสำเร็จ!', `รายวิชา ${subjectName} ถูกลบเรียบร้อยแล้ว`, 'success'); loadAndPopulateSubjects(); }).catch(err => { Swal.fire('ผิดพลาดในการลบ', `ไม่สามารถลบข้อมูลรายวิชา: ${err.message}`, 'error'); }); } }); }
@@ -473,10 +486,15 @@ async function handleDeleteAttendanceForDate() {
 // ================== ROOMS (Dynamic from Firebase) ==================
 async function populateRoomsFromStudents() {
   await waitForAuth();
-  const roomButtonsWrap = document.getElementById('attendance-room-buttons');
   const summaryRoomSelect = document.getElementById('summary-room');
-  roomButtonsWrap.innerHTML = '<p class="text-gray-500">กำลังโหลดห้องเรียน...</p>';
+  const attendanceRoomSelect = document.getElementById('attendance-room');
+
+  if (attendanceRoomSelect) {
+    attendanceRoomSelect.innerHTML = '<option value="">กำลังโหลดห้องเรียน...</option>';
+    attendanceRoomSelect.disabled = true;
+  }
   summaryRoomSelect.innerHTML = '<option value="">กำลังโหลดห้องเรียน...</option>';
+
   try {
     const snapshot = await database.ref('students').once('value');
     const roomSet = new Set();
@@ -487,17 +505,11 @@ async function populateRoomsFromStudents() {
       });
     }
     const rooms = Array.from(roomSet).sort();
+    availableRoomsList = rooms;
 
-    roomButtonsWrap.innerHTML = '';
-    if (rooms.length === 0) {
-      roomButtonsWrap.innerHTML = '<p class="text-gray-500">ยังไม่มีข้อมูลห้องเรียน</p>';
-    } else {
-      rooms.forEach(r => {
-        const btn = document.createElement('button');
-        btn.className = 'room-btn px-4 py-2 bg-gray-200 rounded hover:bg-blue-100';
-        btn.dataset.room = r; btn.textContent = r;
-        roomButtonsWrap.appendChild(btn);
-      });
+    if (attendanceRoomSelect) {
+      attendanceRoomSelect.innerHTML = '<option value="">กรุณาเลือกรายวิชาก่อน</option>';
+      attendanceRoomSelect.disabled = true;
     }
 
     summaryRoomSelect.innerHTML = '<option value="">เลือกห้องเรียน</option>';
@@ -507,87 +519,157 @@ async function populateRoomsFromStudents() {
       summaryRoomSelect.appendChild(opt);
     });
 
-    setupRoomSelectionDynamic();
+    updateAttendanceRoomOptions();
   } catch (err) {
-    roomButtonsWrap.innerHTML = '<p class="text-red-500">โหลดห้องเรียนไม่สำเร็จ</p>';
+    if (attendanceRoomSelect) {
+      attendanceRoomSelect.innerHTML = '<option value="">โหลดห้องเรียนไม่สำเร็จ</option>';
+      attendanceRoomSelect.disabled = true;
+    }
     summaryRoomSelect.innerHTML = '<option value="">โหลดห้องเรียนไม่สำเร็จ</option>';
   }
 }
-function setupRoomSelectionDynamic() {
-  document.querySelectorAll('#attendance-room-buttons .room-btn').forEach(button => {
-    const newBtn = button.cloneNode(true);
-    button.parentNode.replaceChild(newBtn, button);
-    newBtn.addEventListener('click', () => {
-      document.querySelectorAll('#attendance-room-buttons .room-btn').forEach(btn => btn.classList.remove('bg-blue-500', 'text-white'));
-      newBtn.classList.add('bg-blue-500', 'text-white');
-      selectedRoomForAttendance = newBtn.dataset.room;
-      if (selectedSubjectForAttendance) loadStudentsForAttendance(selectedRoomForAttendance);
-      checkEnableButtons();
-    });
+
+function refreshAttendanceYearOptions(yearSelectElement) {
+  const selectEl = yearSelectElement || document.getElementById('attendance-year');
+  if (!selectEl) return;
+  const previousValue = selectEl.value;
+  selectEl.innerHTML = '<option value="">เลือกปีการศึกษา</option>';
+  const years = Array.from(availableSubjectYears).sort((a, b) => b - a);
+  years.forEach(year => {
+    const opt = document.createElement('option');
+    opt.value = year;
+    opt.textContent = year;
+    selectEl.appendChild(opt);
   });
+  if (previousValue && years.includes(Number(previousValue))) {
+    selectEl.value = previousValue;
+  }
 }
 
 // ================== Subjects (with current-term filter) ==================
-let allSubjectsData = {}; 
+let allSubjectsData = {};
+let subjectsByTerm = {};
+let availableSubjectYears = new Set();
+let availableRoomsList = [];
+
+function getTermKey(semester, year) {
+  return `${semester}|${year}`;
+}
+
+function normalizeRooms(rawRooms) {
+  if (Array.isArray(rawRooms)) {
+    return Array.from(new Set(rawRooms.map(r => String(r).trim()).filter(Boolean)));
+  }
+  if (rawRooms && typeof rawRooms === 'object') {
+    return Array.from(new Set(Object.values(rawRooms).map(r => String(r).trim()).filter(Boolean)));
+  }
+  if (typeof rawRooms === 'string') {
+    return Array.from(new Set(rawRooms.split(',').map(r => r.trim()).filter(Boolean)));
+  }
+  return [];
+}
 async function loadAndPopulateSubjects() {
   await waitForAuth();
   const subjectListAdmin = document.getElementById('subject-list-admin');
   const subjectSummaryCardsContainer = document.getElementById('subject-summary-cards-display');
-  const attendanceSubjectButtonsContainer = document.getElementById('attendance-subject-buttons');
+  const attendanceSubjectSelect = document.getElementById('attendance-subject');
+  const attendanceRoomSelect = document.getElementById('attendance-room');
+  const attendanceSemesterSelect = document.getElementById('attendance-semester');
+  const attendanceYearSelect = document.getElementById('attendance-year');
   const summarySubjectSelect = document.getElementById('summary-subject');
   const filterOnlyCurrent = document.getElementById('filter-current-term')?.checked === true;
 
   subjectListAdmin.innerHTML = '<p class="text-gray-500 col-span-full">กำลังโหลดรายวิชา...</p>';
   subjectSummaryCardsContainer.innerHTML = '<p class="text-gray-500 col-span-full">กำลังโหลดรายวิชา...</p>';
-  attendanceSubjectButtonsContainer.innerHTML = '<p class="text-gray-500">กำลังโหลดรายวิชา...</p>';
+  if (attendanceSubjectSelect) {
+    attendanceSubjectSelect.innerHTML = '<option value="">กรุณาเลือกภาคเรียนและปีการศึกษาก่อน</option>';
+    attendanceSubjectSelect.disabled = true;
+  }
+  if (attendanceRoomSelect) {
+    attendanceRoomSelect.innerHTML = '<option value="">กรุณาเลือกรายวิชาก่อน</option>';
+    attendanceRoomSelect.disabled = true;
+  }
   summarySubjectSelect.innerHTML = '<option value="">กำลังโหลดรายวิชา...</option>';
-  allSubjectsData = {}; let subjectsArrayForOrder = [];
+
+  allSubjectsData = {};
+  subjectsByTerm = {};
+  availableSubjectYears = new Set();
+  let subjectsArrayForOrder = [];
 
   try {
     const snapshot = await database.ref('subjects').once('value');
-    subjectListAdmin.innerHTML = '';  subjectSummaryCardsContainer.innerHTML = ''; attendanceSubjectButtonsContainer.innerHTML = ''; summarySubjectSelect.innerHTML = '<option value="">เลือกรายวิชา</option>';
+    subjectListAdmin.innerHTML = '';
+    subjectSummaryCardsContainer.innerHTML = '';
+    summarySubjectSelect.innerHTML = '<option value="">เลือกรายวิชา</option>';
 
     if (snapshot.exists()) {
       snapshot.forEach(childSnapshot => {
         const subject = { firebaseKey: childSnapshot.key, ...childSnapshot.val() };
 
-        // ---- BEGIN: normalize legacy subject fields (one-time auto patch) ----
-        let needsPatch = false;
+        let updatePayload = {};
 
         const rawSem = Number(subject.semester);
         if (!(rawSem === 1 || rawSem === 2)) {
           subject.semester = CURRENT_SEMESTER;
-          needsPatch = true;
+          updatePayload.semester = subject.semester;
         }
+
         const rawYear = Number(subject.yearBE);
         if (!Number.isFinite(rawYear) || rawYear < 2400 || rawYear > 3100) {
           subject.yearBE = CURRENT_YEAR_BE;
-          needsPatch = true;
+          updatePayload.yearBE = subject.yearBE;
         }
-        if (typeof subject.activeThisTerm === 'undefined') {
-          subject.activeThisTerm = true;
-          needsPatch = true;
+
+        const normalizedRooms = normalizeRooms(subject.rooms);
+        let roomsNeedsPatch = false;
+        if (typeof subject.rooms === 'string') {
+          roomsNeedsPatch = true;
+        } else if (Array.isArray(subject.rooms)) {
+          const originalSanitized = subject.rooms.map(r => String(r).trim()).filter(Boolean);
+          if (originalSanitized.length !== normalizedRooms.length || originalSanitized.some((val, idx) => val !== normalizedRooms[idx])) {
+            roomsNeedsPatch = true;
+          }
+        } else if (normalizedRooms.length > 0) {
+          roomsNeedsPatch = true;
         }
-        if (needsPatch && subject.firebaseKey) {
-          database.ref(`subjects/${subject.firebaseKey}`).update({
-            semester: subject.semester,
-            yearBE: subject.yearBE,
-            activeThisTerm: subject.activeThisTerm
-          }).catch(err => {
+        subject.rooms = normalizedRooms;
+        if (roomsNeedsPatch) {
+          updatePayload.rooms = normalizedRooms;
+        }
+
+        if (subject.firebaseKey && Object.keys(updatePayload).length > 0) {
+          database.ref(`subjects/${subject.firebaseKey}`).update(updatePayload).catch(err => {
             console.warn('[subjects] patch legacy fields failed:', err);
           });
         }
-        // ---- END: normalize legacy subject fields ----
 
         if (!subject.code || !subject.name) return;
+
+        const semester = Number(subject.semester) || CURRENT_SEMESTER;
+        const year = Number(subject.yearBE) || CURRENT_YEAR_BE;
+        const termKey = getTermKey(semester, year);
+        if (!subjectsByTerm[termKey]) subjectsByTerm[termKey] = [];
+        subjectsByTerm[termKey].push(subject);
+        availableSubjectYears.add(year);
+
+        subject.semester = semester;
+        subject.yearBE = year;
         subject.order = (typeof subject.order === 'number' && !isNaN(subject.order)) ? subject.order : Number.MAX_SAFE_INTEGER;
         subjectsArrayForOrder.push(subject);
       });
-      subjectsArrayForOrder.sort((a, b) => { if (a.order < b.order) return -1; if (a.order > b.order) return 1; if (a.code < b.code) return -1; if (a.code > b.code) return 1; return 0; });
+
+      subjectsArrayForOrder.sort((a, b) => {
+        if (a.order < b.order) return -1;
+        if (a.order > b.order) return 1;
+        if (a.code < b.code) return -1;
+        if (a.code > b.code) return 1;
+        return 0;
+      });
 
       subjectsArrayForOrder.forEach((subject, index) => {
         allSubjectsData[subject.code] = subject;
-        // Admin card (always show)
+        const roomsText = subject.rooms && subject.rooms.length ? subject.rooms.join(', ') : 'ยังไม่กำหนดห้อง';
+
         const adminCard = document.createElement('div');
         adminCard.className = 'border rounded-lg p-4 hover:shadow-md transition-shadow';
         adminCard.innerHTML = `
@@ -596,9 +678,7 @@ async function loadAndPopulateSubjects() {
               <h3 class="font-semibold text-lg">${subject.name}</h3>
               <p class="text-gray-600">รหัสวิชา: ${subject.code}</p>
               <p class="text-xs text-gray-500">ภาคเรียน ${subject.semester || '-'} / พ.ศ. ${subject.yearBE || '-'}</p>
-              <p class="text-xs ${subject.activeThisTerm === false ? 'text-rose-600' : 'text-emerald-600'}">
-                ${subject.activeThisTerm === false ? 'ปิดใช้ภาคเรียนนี้' : 'เปิดใช้ภาคเรียนนี้'}
-              </p>
+              <p class="text-xs text-gray-500">ห้องที่สอน: ${roomsText}</p>
             </div>
             <div class="flex flex-col space-y-1 no-print">
               <button class="move-subject-up-btn sort-btn bg-gray-200 hover:bg-gray-300 rounded ${index === 0 ? 'opacity-50 cursor-not-allowed' : ''}" data-key="${subject.firebaseKey}" ${index === 0 ? 'disabled' : ''}>▲</button>
@@ -611,13 +691,13 @@ async function loadAndPopulateSubjects() {
           </div>`;
         subjectListAdmin.appendChild(adminCard);
 
-        // Summary cards + attendance buttons + summary dropdown (filtered)
         if (!filterOnlyCurrent || isSubjectInCurrentTerm(subject)) {
           const summaryCard = document.createElement('div');
           summaryCard.className = 'border rounded-lg p-4 hover:shadow-md transition-shadow';
           summaryCard.innerHTML = `
             <h3 class="font-semibold text-lg">${subject.name}</h3>
             <p class="text-gray-600">รหัสวิชา: ${subject.code}</p>
+            <p class="text-xs text-gray-500">ห้องที่สอน: ${roomsText}</p>
             ${isSubjectInCurrentTerm(subject) ? '<p class="text-xs text-emerald-600">ภาคเรียนปัจจุบัน</p>' : ''}
             <div class="mt-3 flex justify-end">
               <button class="view-subject-summary-btn px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 no-print" data-subject-code="${subject.code}" data-subject-name="${subject.name}">ดูสรุป</button>
@@ -625,36 +705,40 @@ async function loadAndPopulateSubjects() {
           subjectSummaryCardsContainer.appendChild(summaryCard);
 
           if (isSubjectInCurrentTerm(subject)) {
-            const attBtnElement = document.createElement('button');
-            attBtnElement.className = 'subject-btn px-4 py-2 bg-gray-200 rounded hover:bg-blue-100';
-            attBtnElement.dataset.subjectCode = subject.code; attBtnElement.textContent = subject.name;
-            attendanceSubjectButtonsContainer.appendChild(attBtnElement);
-
             const optionElement = document.createElement('option');
-            optionElement.value = subject.code; optionElement.textContent = `${subject.name} (${subject.code})`;
+            optionElement.value = subject.code;
+            optionElement.textContent = `${subject.name} (${subject.code})`;
             summarySubjectSelect.appendChild(optionElement);
           }
         }
       });
 
       setupSubjectAdminButtons();
-      setupAttendanceSubjectButtonsDynamic();
       setupViewSubjectSummaryButtonsDynamic();
-
-      if (attendanceSubjectButtonsContainer.children.length === 0) {
-        attendanceSubjectButtonsContainer.innerHTML = '<p class="text-gray-500">ยังไม่มีวิชาของภาคเรียนนี้</p>';
+      if (!subjectSummaryCardsContainer.hasChildNodes()) {
+        subjectSummaryCardsContainer.innerHTML = '<p class="text-gray-500 col-span-full">ไม่มีรายวิชาที่ตรงกับการกรอง</p>';
       }
+      refreshAttendanceYearOptions(attendanceYearSelect);
+      updateAttendanceSubjectOptions();
+      updateAttendanceRoomOptions();
     } else {
       const noMsg = '<p class="text-gray-500 col-span-full">ไม่พบรายวิชา กรุณาเพิ่มรายวิชาใหม่</p>';
-      subjectListAdmin.innerHTML = noMsg; subjectSummaryCardsContainer.innerHTML = noMsg;
-      attendanceSubjectButtonsContainer.innerHTML = '<p class="text-gray-500">ไม่มีรายวิชา</p>';
+      subjectListAdmin.innerHTML = noMsg;
+      subjectSummaryCardsContainer.innerHTML = noMsg;
+      if (attendanceSubjectSelect) {
+        attendanceSubjectSelect.innerHTML = '<option value="">ยังไม่มีรายวิชา</option>';
+        attendanceSubjectSelect.disabled = true;
+      }
       summarySubjectSelect.innerHTML = '<option value="">ไม่มีรายวิชา</option>';
     }
   } catch (error) {
     Swal.fire('ผิดพลาดโหลดรายวิชา', `ไม่สามารถโหลดข้อมูลรายวิชา: ${error.message}`, 'error');
     subjectListAdmin.innerHTML = '<p class="text-red-500 col-span-full">เกิดข้อผิดพลาดในการโหลดรายวิชา</p>';
     subjectSummaryCardsContainer.innerHTML = '<p class="text-red-500 col-span-full">เกิดข้อผิดพลาดในการโหลดรายวิชา</p>';
-    attendanceSubjectButtonsContainer.innerHTML = '<p class="text-red-500">เกิดข้อผิดพลาด</p>';
+    if (attendanceSubjectSelect) {
+      attendanceSubjectSelect.innerHTML = '<option value="">เกิดข้อผิดพลาด</option>';
+      attendanceSubjectSelect.disabled = true;
+    }
     summarySubjectSelect.innerHTML = '<option value="">โหลดผิดพลาด</option>';
   }
 }
@@ -676,9 +760,6 @@ async function handleMoveSubject(subjectKey, direction) {
     if (targetIndex !== -1) { const temp = subjectsArray[currentIndex]; subjectsArray.splice(currentIndex, 1); subjectsArray.splice(targetIndex, 0, temp); const updates = {}; subjectsArray.forEach((subject, index) => { if (subject.order !== index) { updates[`/subjects/${subject.firebaseKey}/order`] = index; } }); if (Object.keys(updates).length > 0) { await database.ref().update(updates); } await loadAndPopulateSubjects(); Swal.close(); } else { Swal.close(); }
   } catch (err) { Swal.fire('ผิดพลาด', `ไม่สามารถจัดลำดับรายวิชาได้: ${err.message}`, 'error'); }
 }
-function setupAttendanceSubjectButtonsDynamic() {
-  document.querySelectorAll('#attendance-subject-buttons .subject-btn').forEach(buttonEl => { const newButtonEl = buttonEl.cloneNode(true); buttonEl.parentNode.replaceChild(newButtonEl, buttonEl); newButtonEl.addEventListener('click', () => { document.querySelectorAll('#attendance-subject-buttons .subject-btn').forEach(innerBtn => innerBtn.classList.remove('bg-blue-500', 'text-white')); newButtonEl.classList.add('bg-blue-500', 'text-white'); selectedSubjectForAttendance = newButtonEl.dataset.subjectCode; if (selectedRoomForAttendance) loadStudentsForAttendance(selectedRoomForAttendance); checkEnableButtons(); }); });
-}
 function setupViewSubjectSummaryButtonsDynamic() { document.querySelectorAll('#subject-summary-cards-display .view-subject-summary-btn').forEach(buttonEl => { const newButtonEl = buttonEl.cloneNode(true); buttonEl.parentNode.replaceChild(newButtonEl, buttonEl); newButtonEl.addEventListener('click', (e) => { const subjectCode = e.currentTarget.dataset.subjectCode; const subjectName = e.currentTarget.dataset.subjectName; displaySubjectSummary(subjectCode, subjectName); }); }); }
 
 // --- Tab Navigation & Buttons ---
@@ -695,8 +776,163 @@ let selectedRoomForAttendance = null;
 let selectedSubjectForAttendance = null;
 let latestSummaryRange = null;
 
-async function loadStudentsForAttendance(room) { 
-  const studentListBody = document.getElementById('student-list'); const date = document.getElementById('attendance-date').value; const subjectCode = selectedSubjectForAttendance; 
+function resetAttendanceStudentTable(message = 'กรุณาเลือกห้องเรียน, รายวิชา และวันที่') {
+  const studentListBody = document.getElementById('student-list');
+  if (!studentListBody) return;
+  studentListBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-gray-500">${message}</td></tr>`;
+}
+
+function updateAttendanceSubjectOptions() {
+  const subjectSelect = document.getElementById('attendance-subject');
+  const semesterSelect = document.getElementById('attendance-semester');
+  const yearSelect = document.getElementById('attendance-year');
+  if (!subjectSelect || !semesterSelect || !yearSelect) return;
+
+  const semester = parseInt(semesterSelect.value, 10);
+  const year = parseInt(yearSelect.value, 10);
+
+  if (!(semester === 1 || semester === 2) || !Number.isFinite(year)) {
+    subjectSelect.innerHTML = '<option value="">กรุณาเลือกภาคเรียนและปีการศึกษาก่อน</option>';
+    subjectSelect.disabled = true;
+    selectedSubjectForAttendance = null;
+    resetAttendanceStudentTable();
+    checkEnableButtons();
+    return;
+  }
+
+  const termKey = getTermKey(semester, year);
+  const subjects = subjectsByTerm[termKey] || [];
+  if (subjects.length === 0) {
+    subjectSelect.innerHTML = '<option value="">ยังไม่มีรายวิชาในภาคเรียนนี้</option>';
+    subjectSelect.disabled = true;
+    selectedSubjectForAttendance = null;
+    resetAttendanceStudentTable();
+    checkEnableButtons();
+    return;
+  }
+
+  const sortedSubjects = [...subjects].sort((a, b) => {
+    if (a.order < b.order) return -1;
+    if (a.order > b.order) return 1;
+    if (a.code < b.code) return -1;
+    if (a.code > b.code) return 1;
+    return 0;
+  });
+
+  subjectSelect.innerHTML = '<option value="">เลือกรายวิชา</option>';
+  sortedSubjects.forEach(subj => {
+    const opt = document.createElement('option');
+    opt.value = subj.code;
+    opt.textContent = `${subj.name} (${subj.code})`;
+    subjectSelect.appendChild(opt);
+  });
+
+  subjectSelect.disabled = false;
+  if (selectedSubjectForAttendance && sortedSubjects.some(subj => subj.code === selectedSubjectForAttendance)) {
+    subjectSelect.value = selectedSubjectForAttendance;
+  } else {
+    subjectSelect.value = '';
+    selectedSubjectForAttendance = null;
+    resetAttendanceStudentTable();
+  }
+
+  checkEnableButtons();
+}
+
+function updateAttendanceRoomOptions() {
+  const roomSelect = document.getElementById('attendance-room');
+  const subjectSelect = document.getElementById('attendance-subject');
+  if (!roomSelect) return;
+
+  const subjectCode = subjectSelect ? subjectSelect.value : selectedSubjectForAttendance;
+  if (!subjectCode) {
+    roomSelect.innerHTML = '<option value="">กรุณาเลือกรายวิชาก่อน</option>';
+    roomSelect.disabled = true;
+    selectedRoomForAttendance = null;
+    resetAttendanceStudentTable();
+    checkEnableButtons();
+    return;
+  }
+  let rooms = [];
+  let placeholder = 'เลือกห้องเรียน';
+
+  if (subjectCode && allSubjectsData[subjectCode]) {
+    rooms = normalizeRooms(allSubjectsData[subjectCode].rooms);
+  }
+
+  if (!rooms.length && availableRoomsList.length) {
+    rooms = [...availableRoomsList];
+    placeholder = 'ยังไม่ได้กำหนดห้องสำหรับวิชานี้ - แสดงทุกห้อง';
+  }
+
+  const uniqueRooms = Array.from(new Set(rooms.map(r => String(r).trim()).filter(Boolean))).sort();
+
+  if (uniqueRooms.length === 0) {
+    roomSelect.innerHTML = '<option value="">ยังไม่มีข้อมูลห้องเรียน</option>';
+    roomSelect.disabled = true;
+    selectedRoomForAttendance = null;
+    resetAttendanceStudentTable();
+    checkEnableButtons();
+    return;
+  }
+
+  roomSelect.innerHTML = `<option value="">${placeholder}</option>`;
+  uniqueRooms.forEach(room => {
+    const opt = document.createElement('option');
+    opt.value = room;
+    opt.textContent = room;
+    roomSelect.appendChild(opt);
+  });
+
+  roomSelect.disabled = false;
+  if (selectedRoomForAttendance && uniqueRooms.includes(selectedRoomForAttendance)) {
+    roomSelect.value = selectedRoomForAttendance;
+  } else {
+    roomSelect.value = '';
+    selectedRoomForAttendance = null;
+  }
+
+  checkEnableButtons();
+}
+
+function handleAttendanceTermChange() {
+  selectedSubjectForAttendance = null;
+  selectedRoomForAttendance = null;
+  const subjectSelect = document.getElementById('attendance-subject');
+  const roomSelect = document.getElementById('attendance-room');
+  if (subjectSelect) subjectSelect.value = '';
+  if (roomSelect) roomSelect.value = '';
+  updateAttendanceSubjectOptions();
+  updateAttendanceRoomOptions();
+  resetAttendanceStudentTable();
+}
+
+function handleAttendanceSubjectChange() {
+  const subjectSelect = document.getElementById('attendance-subject');
+  selectedSubjectForAttendance = subjectSelect && subjectSelect.value ? subjectSelect.value : null;
+  selectedRoomForAttendance = null;
+  const roomSelect = document.getElementById('attendance-room');
+  if (roomSelect) roomSelect.value = '';
+  updateAttendanceRoomOptions();
+  if (!selectedSubjectForAttendance) {
+    resetAttendanceStudentTable();
+  }
+  checkEnableButtons();
+}
+
+function handleAttendanceRoomChange() {
+  const roomSelect = document.getElementById('attendance-room');
+  selectedRoomForAttendance = roomSelect && roomSelect.value ? roomSelect.value : null;
+  if (selectedRoomForAttendance && selectedSubjectForAttendance) {
+    loadStudentsForAttendance(selectedRoomForAttendance);
+  } else {
+    resetAttendanceStudentTable();
+  }
+  checkEnableButtons();
+}
+
+async function loadStudentsForAttendance(room) {
+  const studentListBody = document.getElementById('student-list'); const date = document.getElementById('attendance-date').value; const subjectCode = selectedSubjectForAttendance;
   const deleteButton = document.getElementById('delete-day-attendance-btn');
   if (!room || !subjectCode || !date) { studentListBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-gray-500">กรุณาเลือกห้องเรียน, รายวิชา, และวันที่</td></tr>`; deleteButton.classList.add('hidden'); return; }
   studentListBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-500">กำลังโหลด...</td></tr>';
@@ -729,6 +965,16 @@ function setupAttendanceStatusButtons() { document.querySelectorAll('#student-li
 
 // --- Action Buttons & Modal Controls ---
 function setupActionButtons() {
+  const semesterSelect = document.getElementById('attendance-semester');
+  const yearSelect = document.getElementById('attendance-year');
+  const subjectSelect = document.getElementById('attendance-subject');
+  const roomSelect = document.getElementById('attendance-room');
+
+  if (semesterSelect) semesterSelect.addEventListener('change', handleAttendanceTermChange);
+  if (yearSelect) yearSelect.addEventListener('change', handleAttendanceTermChange);
+  if (subjectSelect) subjectSelect.addEventListener('change', handleAttendanceSubjectChange);
+  if (roomSelect) roomSelect.addEventListener('change', handleAttendanceRoomChange);
+
   document.getElementById('save-attendance').addEventListener('click', async () => {
     await waitForAuth(); 
     const date = document.getElementById('attendance-date').value; 
@@ -1337,7 +1583,7 @@ function setupModalControls() {
     await waitForAuth(); e.preventDefault(); const studentKey = document.getElementById('student-firebase-key-edit').value; const studentData = { studentId: document.getElementById('student-id').value.trim(), room: document.getElementById('student-room').value.trim(), number: document.getElementById('student-number').value.trim(), name: document.getElementById('student-name').value.trim(), nickname: document.getElementById('student-nickname').value.trim(), email: document.getElementById('student-email').value.trim() }; if (!studentData.studentId || !studentData.room || !studentData.number || !studentData.name) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่จำเป็น', 'warning'); return; } Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); let promise; if (studentKey) { promise = database.ref(`students/${studentKey}`).update(studentData); } else { const ref = database.ref('students').push(); studentData.firebaseKey = ref.key; promise = ref.set(studentData); } promise.then(() => { Swal.fire('สำเร็จ', `บันทึกข้อมูลนักเรียนแล้ว`, 'success'); document.getElementById('add-student-modal').classList.add('hidden'); loadAllStudentsData(); populateRoomsFromStudents(); }).catch(err => { Swal.fire('ผิดพลาด', `บันทึกไม่สำเร็จ: ${err.message}`, 'error'); }); });
 
   // Subjects
-  document.getElementById('add-new-subject-btn').addEventListener('click', () => { document.getElementById('add-subject-form').reset(); document.getElementById('subject-firebase-key-edit').value = ''; document.getElementById('subject-semester').value = CURRENT_SEMESTER; document.getElementById('subject-yearbe').value  = CURRENT_YEAR_BE; document.getElementById('subject-active-this-term').checked = true; document.getElementById('add-subject-modal').classList.remove('hidden'); });
+  document.getElementById('add-new-subject-btn').addEventListener('click', () => { document.getElementById('add-subject-form').reset(); document.getElementById('subject-firebase-key-edit').value = ''; document.getElementById('subject-semester').value = CURRENT_SEMESTER; document.getElementById('subject-yearbe').value  = CURRENT_YEAR_BE; document.getElementById('subject-rooms').value = ''; document.getElementById('add-subject-modal').classList.remove('hidden'); });
   document.getElementById('cancel-add-subject').addEventListener('click', () => { document.getElementById('add-subject-modal').classList.add('hidden'); });
   document.getElementById('add-subject-form').addEventListener('submit', async (e) => {
     await waitForAuth(); 
@@ -1351,13 +1597,16 @@ function setupModalControls() {
     if (!Number.isFinite(year) || year < 2400 || year > 3100) year = CURRENT_YEAR_BE;
 
     const subjectKeyToEdit = document.getElementById('subject-firebase-key-edit').value; 
-    const subjectDataToSave = { 
-      code: document.getElementById('subject-code').value.trim(), 
-      name: document.getElementById('subject-name').value.trim(), 
-      semester: sem, 
-      yearBE: year, 
-      activeThisTerm: document.getElementById('subject-active-this-term').checked 
-    }; 
+    const roomsInput = document.getElementById('subject-rooms').value;
+    const subjectRooms = Array.from(new Set(roomsInput.split(',').map(room => room.trim()).filter(room => room.length > 0)));
+
+    const subjectDataToSave = {
+      code: document.getElementById('subject-code').value.trim(),
+      name: document.getElementById('subject-name').value.trim(),
+      semester: sem,
+      yearBE: year,
+      rooms: subjectRooms
+    };
 
     if (!subjectDataToSave.code || !subjectDataToSave.name) { 
       Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกรหัสวิชาและชื่อวิชา', 'warning'); 
