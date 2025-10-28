@@ -426,6 +426,33 @@ const ABSENT_WARNING_PERCENT_THRESHOLD = 0.20; // ขาดเกิน 20% ข�
 // ==================================================================================
 function getStatusColor(status) { const colors = { 'ม': 'bg-green-500', 'ข': 'bg-red-500', 'ป': 'bg-yellow-500', 'ก': 'bg-blue-500', 'ส': 'bg-orange-500' }; return colors[status] || 'bg-gray-500';}
 function getSubjectNameFromCode(code) { return (allSubjectsData[code] && allSubjectsData[code].name) ? allSubjectsData[code].name : code;}
+function formatDateISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function parseISODate(value) {
+  if (!value) return null;
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function createDateRange(startValue, endValue) {
+  const startDate = parseISODate(startValue);
+  const endDate = parseISODate(endValue);
+  if (!startDate || !endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+    return [];
+  }
+  const dates = [];
+  const cursor = new Date(startDate);
+  while (cursor <= endDate) {
+    dates.push(formatDateISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+function formatPercent(value) { return Number.isFinite(value) ? value.toFixed(1) : '0.0'; }
 
 async function handleEditStudentModal(event) {
   await waitForAuth(); const studentKey = event.target.dataset.key; database.ref(`students/${studentKey}`).once('value') .then(snapshot => { if (snapshot.exists()) { const data = snapshot.val(); document.getElementById('student-firebase-key-edit').value = studentKey; document.getElementById('student-id').value = data.studentId || ''; document.getElementById('student-room').value = data.room; document.getElementById('student-number').value = data.number; document.getElementById('student-name').value = data.name; document.getElementById('student-nickname').value = data.nickname || ''; document.getElementById('student-email').value = data.email || ''; document.getElementById('add-student-modal').classList.remove('hidden'); } else { Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลนักเรียนที่ต้องการแก้ไข', 'error'); } }) .catch(err => { Swal.fire('ผิดพลาดโหลดข้อมูลนักเรียน', `ไม่สามารถโหลดข้อมูลนักเรียนเพื่อแก้ไข: ${err.message}`, 'error'); }); }
@@ -664,8 +691,9 @@ async function loadAllStudentsData() {
 function setupStudentActionButtons() { document.querySelectorAll('.edit-student-btn').forEach(btn => { const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn); newBtn.addEventListener('click', handleEditStudentModal); }); document.querySelectorAll('.delete-student-btn').forEach(btn => { const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn); newBtn.addEventListener('click', handleDeleteStudent); });}
 
 // --- Attendance Checking ---
-let selectedRoomForAttendance = null; 
+let selectedRoomForAttendance = null;
 let selectedSubjectForAttendance = null;
+let latestSummaryRange = null;
 
 async function loadStudentsForAttendance(room) { 
   const studentListBody = document.getElementById('student-list'); const date = document.getElementById('attendance-date').value; const subjectCode = selectedSubjectForAttendance; 
@@ -755,8 +783,551 @@ function setupActionButtons() {
   document.getElementById('delete-day-attendance-btn').addEventListener('click', handleDeleteAttendanceForDate); 
   document.getElementById('view-summary').addEventListener('click', () => { if (selectedRoomForAttendance && selectedSubjectForAttendance) { document.getElementById('summary-room').value = selectedRoomForAttendance; document.getElementById('summary-subject').value = selectedSubjectForAttendance; document.getElementById('nav-summary').click(); document.getElementById('generate-summary').click(); } else { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกห้องและวิชาก่อน', 'warning'); } });
   document.getElementById('generate-summary').addEventListener('click', generateAttendanceSummary); 
-  document.getElementById('print-summary').addEventListener('click', () => window.print()); 
+  document.getElementById('print-summary').addEventListener('click', () => window.print());
   document.getElementById('print-subject-summary').addEventListener('click', () => window.print());
+}
+
+async function generateAttendanceSummary() {
+  await waitForAuth();
+  const room = document.getElementById('summary-room').value;
+  const subjectCode = document.getElementById('summary-subject').value;
+  const startDateValue = document.getElementById('summary-start-date').value;
+  const endDateValue = document.getElementById('summary-end-date').value;
+  const summaryResultsEl = document.getElementById('summary-results');
+  const summaryListEl = document.getElementById('summary-list');
+
+  if (!room || !subjectCode || !startDateValue || !endDateValue) {
+    summaryResultsEl.classList.add('hidden');
+    Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกห้องเรียน, รายวิชา และช่วงวันที่ให้ครบถ้วน', 'warning');
+    return;
+  }
+  if (startDateValue > endDateValue) {
+    summaryResultsEl.classList.add('hidden');
+    Swal.fire('ช่วงวันที่ไม่ถูกต้อง', 'วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด', 'error');
+    return;
+  }
+
+  Swal.fire({ title: 'กำลังดึงข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try {
+    const studentsSnapshot = await database.ref('students').orderByChild('room').equalTo(room).once('value');
+    if (!studentsSnapshot.exists()) {
+      throw new Error(`ไม่พบนักเรียนในห้อง ${room}`);
+    }
+
+    const students = [];
+    studentsSnapshot.forEach(child => {
+      const data = child.val() || {};
+      students.push({
+        key: child.key,
+        number: data.number || '',
+        studentId: data.studentId || '',
+        name: data.name || '',
+        nickname: data.nickname || ''
+      });
+    });
+    students.sort((a, b) => {
+      const numA = parseInt(a.number, 10);
+      const numB = parseInt(b.number, 10);
+      if (Number.isNaN(numA) && Number.isNaN(numB)) return (a.name || '').localeCompare(b.name || '', 'th');
+      if (Number.isNaN(numA)) return 1;
+      if (Number.isNaN(numB)) return -1;
+      return numA - numB;
+    });
+
+    const dateRange = createDateRange(startDateValue, endDateValue);
+    if (dateRange.length === 0) {
+      throw new Error('ช่วงวันที่ไม่ถูกต้อง');
+    }
+
+    const attendanceSnapshots = await Promise.all(dateRange.map(date =>
+      database.ref(`attendance/${date}/${subjectCode}/${room}`).once('value')
+        .then(snapshot => ({ date, data: snapshot.val() || {} }))
+        .catch(() => ({ date, data: {} }))
+    ));
+
+    const summaryByStudent = {};
+    students.forEach(student => {
+      summaryByStudent[student.key] = {
+        ...student,
+        counts: { present: 0, absent: 0, sick: 0, activity: 0, late: 0 },
+        attendancePercent: 0,
+        effectiveAbsent: 0,
+        latePenalty: 0
+      };
+    });
+
+    const calendarDates = new Set();
+    const dailyStats = [];
+
+    attendanceSnapshots.forEach(({ date, data }) => {
+      if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+        return;
+      }
+      calendarDates.add(date);
+      let dayPresent = 0;
+      let dayExcused = 0;
+      let dayAbsent = 0;
+      let dayLate = 0;
+      students.forEach(student => {
+        const entry = data[student.key];
+        const status = entry && entry.status ? entry.status : 'ข';
+        const summary = summaryByStudent[student.key];
+        switch (status) {
+          case 'ม':
+            summary.counts.present += 1;
+            dayPresent += 1;
+            break;
+          case 'ป':
+            summary.counts.sick += 1;
+            dayExcused += 1;
+            break;
+          case 'ก':
+            summary.counts.activity += 1;
+            dayExcused += 1;
+            break;
+          case 'ส':
+            summary.counts.late += 1;
+            dayLate += 1;
+            break;
+          case 'ข':
+          default:
+            summary.counts.absent += 1;
+            dayAbsent += 1;
+            break;
+        }
+      });
+
+      const totalStudents = students.length;
+      const effectivePresent = totalStudents > 0 ? ((dayPresent + dayExcused) / totalStudents) * 100 : 0;
+      dailyStats.push({ date, attendancePercent: effectivePresent, present: dayPresent, excused: dayExcused, absent: dayAbsent, late: dayLate });
+    });
+
+    const daysWithRecords = dailyStats.length;
+    if (daysWithRecords === 0) {
+      summaryResultsEl.classList.add('hidden');
+      Swal.close();
+      Swal.fire('ไม่พบข้อมูล', 'ไม่พบข้อมูลการเข้าเรียนในช่วงวันที่เลือก', 'info');
+      return;
+    }
+
+    const summaries = Object.values(summaryByStudent);
+    let totalAttendancePercent = 0;
+    let maxEffectiveAbsent = 0;
+    let maxLate = 0;
+
+    summaries.forEach(summary => {
+      const counts = summary.counts;
+      const totalExcused = counts.sick + counts.activity;
+      const allowedExcusedAsPresent = Math.max(0, Math.round(daysWithRecords * SICK_LEAVE_AS_PRESENT_PERCENT_LIMIT));
+      const excusedAsPresent = Math.min(totalExcused, allowedExcusedAsPresent);
+      const excusedAsAbsent = Math.max(0, totalExcused - excusedAsPresent);
+      const latePenalty = Math.floor(summary.counts.late / LATE_TO_ABSENT_THRESHOLD);
+      const effectivePresent = counts.present + excusedAsPresent;
+      const effectiveAbsent = counts.absent + excusedAsAbsent + latePenalty;
+      const attendancePercent = daysWithRecords > 0 ? Math.min(100, Math.max(0, (effectivePresent / daysWithRecords) * 100)) : 0;
+      summary.attendancePercent = attendancePercent;
+      summary.effectiveAbsent = effectiveAbsent;
+      summary.latePenalty = latePenalty;
+      totalAttendancePercent += attendancePercent;
+      if (effectiveAbsent > maxEffectiveAbsent) maxEffectiveAbsent = effectiveAbsent;
+      if (summary.counts.late > maxLate) maxLate = summary.counts.late;
+    });
+
+    const averageAttendance = summaries.length > 0 ? totalAttendancePercent / summaries.length : 0;
+
+    summaryResultsEl.classList.remove('hidden');
+    summaryListEl.innerHTML = '';
+    summaries.sort((a, b) => {
+      const numA = parseInt(a.number, 10);
+      const numB = parseInt(b.number, 10);
+      if (Number.isNaN(numA) && Number.isNaN(numB)) return (a.name || '').localeCompare(b.name || '', 'th');
+      if (Number.isNaN(numA)) return 1;
+      if (Number.isNaN(numB)) return -1;
+      return numA - numB;
+    });
+
+    const lowAttendanceList = [];
+    const frequentAbsencesList = [];
+    const frequentLatesList = [];
+
+    summaries.forEach(summary => {
+      const row = document.createElement('tr');
+      const absentRatio = daysWithRecords > 0 ? (summary.effectiveAbsent / daysWithRecords) : 0;
+      if (absentRatio >= ABSENT_WARNING_PERCENT_THRESHOLD) {
+        row.classList.add('student-needs-warning');
+        lowAttendanceList.push({
+          name: summary.name || summary.studentId || '-',
+          number: summary.number || '-',
+          absentRatio
+        });
+      }
+      row.innerHTML = `
+        <td class="py-2 px-4 border">${summary.number || '-'}</td>
+        <td class="py-2 px-4 border">${summary.studentId || '-'}</td>
+        <td class="py-2 px-4 border">${summary.name || '-'}</td>
+        <td class="py-2 px-4 border">${summary.counts.present}</td>
+        <td class="py-2 px-4 border">${summary.counts.absent}</td>
+        <td class="py-2 px-4 border">${summary.counts.sick}</td>
+        <td class="py-2 px-4 border">${summary.counts.activity}</td>
+        <td class="py-2 px-4 border">${summary.counts.late}</td>
+        <td class="py-2 px-4 border">${formatPercent(summary.attendancePercent)}</td>`;
+      summaryListEl.appendChild(row);
+    });
+
+    summaries
+      .filter(summary => summary.effectiveAbsent > 0)
+      .sort((a, b) => b.effectiveAbsent - a.effectiveAbsent)
+      .slice(0, 5)
+      .forEach(summary => frequentAbsencesList.push({
+        name: summary.name || summary.studentId || '-',
+        number: summary.number || '-',
+        value: summary.effectiveAbsent
+      }));
+
+    summaries
+      .filter(summary => summary.counts.late > 0)
+      .sort((a, b) => b.counts.late - a.counts.late)
+      .slice(0, 5)
+      .forEach(summary => frequentLatesList.push({
+        name: summary.name || summary.studentId || '-',
+        number: summary.number || '-',
+        value: summary.counts.late
+      }));
+
+    const updateList = (elementId, items, formatter) => {
+      const element = document.getElementById(elementId);
+      if (!element) return;
+      element.innerHTML = '';
+      if (!items.length) {
+        element.innerHTML = '<li>-</li>';
+        return;
+      }
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = formatter(item);
+        element.appendChild(li);
+      });
+    };
+
+    updateList('list-low-attendance', lowAttendanceList, item => `${item.number}. ${item.name} (ขาด ${formatPercent(item.absentRatio * 100)}%)`);
+    updateList('list-frequent-absences', frequentAbsencesList, item => `${item.number}. ${item.name} (${item.value} ครั้ง)`);
+    updateList('list-frequent-lates', frequentLatesList, item => `${item.number}. ${item.name} (${item.value} ครั้ง)`);
+
+    document.getElementById('metric-total-students').textContent = summaries.length;
+    document.getElementById('metric-avg-attendance').textContent = formatPercent(averageAttendance);
+    document.getElementById('metric-total-days').textContent = daysWithRecords;
+    document.getElementById('metric-max-absent').textContent = maxEffectiveAbsent;
+    document.getElementById('metric-max-late').textContent = maxLate;
+
+    const subjectName = getSubjectNameFromCode(subjectCode);
+    document.getElementById('print-class-sum').textContent = `ห้อง ${room}`;
+    document.getElementById('print-subject-sum').textContent = subjectName;
+    document.getElementById('print-date-range-sum').textContent = `${startDateValue} ถึง ${endDateValue}`;
+
+    calendarActiveDates = Array.from(calendarDates).sort();
+    latestSummaryRange = { start: startDateValue, end: endDateValue };
+    currentCalendarDate = parseISODate(startDateValue) || new Date();
+    currentCalendarDate.setDate(1);
+    const calendarContainer = document.getElementById('calendar-container');
+    if (calendarContainer) {
+      if (calendarActiveDates.length > 0) {
+        calendarContainer.classList.remove('hidden');
+        renderAttendanceCalendarDisplay();
+      } else {
+        calendarContainer.classList.add('hidden');
+      }
+    }
+
+    renderOverallAttendanceChart(summaries);
+    renderDailyAttendanceChart(dailyStats);
+    Swal.close();
+  } catch (error) {
+    summaryResultsEl.classList.add('hidden');
+    Swal.close();
+    Swal.fire('ผิดพลาด', `ไม่สามารถสร้างสรุปผลได้: ${error.message}`, 'error');
+  }
+}
+
+function renderOverallAttendanceChart(studentSummaries) {
+  const canvas = document.getElementById('attendance-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  if (window.attendanceChartInstance) {
+    window.attendanceChartInstance.destroy();
+  }
+  const labels = studentSummaries.map(summary => {
+    if (summary.number) {
+      return `${summary.number}. ${summary.name || summary.studentId || '-'}`;
+    }
+    return summary.name || summary.studentId || '-';
+  });
+  const data = studentSummaries.map(summary => Number(formatPercent(summary.attendancePercent)));
+  window.attendanceChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '% การเข้าเรียน',
+        data,
+        backgroundColor: '#3b82f6'
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, max: 100 }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: context => `${context.parsed.y?.toFixed?.(1) ?? context.parsed.y}%`
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderDailyAttendanceChart(dailyStats) {
+  const canvas = document.getElementById('daily-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  if (window.dailyChartInstance) {
+    window.dailyChartInstance.destroy();
+  }
+  const labels = dailyStats.map(item => item.date);
+  const data = dailyStats.map(item => Number(formatPercent(item.attendancePercent)));
+  window.dailyChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '% การมาเรียนของห้อง',
+        data,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        tension: 0.2,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, max: 100 }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: context => `${context.parsed.y?.toFixed?.(1) ?? context.parsed.y}%`
+          }
+        }
+      }
+    }
+  });
+}
+
+function setupCalendarControls() {
+  const prevBtn = document.getElementById('prev-month-btn');
+  const nextBtn = document.getElementById('next-month-btn');
+  if (!prevBtn || !nextBtn) return;
+  prevBtn.addEventListener('click', () => {
+    currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() - 1, 1);
+    renderAttendanceCalendarDisplay();
+  });
+  nextBtn.addEventListener('click', () => {
+    currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + 1, 1);
+    renderAttendanceCalendarDisplay();
+  });
+}
+
+function renderAttendanceCalendarDisplay() {
+  const bodyEl = document.getElementById('calendar-body');
+  const titleEl = document.getElementById('calendar-month-year');
+  if (!bodyEl || !titleEl) return;
+  const isValidDate = currentCalendarDate instanceof Date && !Number.isNaN(currentCalendarDate.getTime());
+  const displayDate = isValidDate ? currentCalendarDate : new Date();
+  const year = displayDate.getFullYear();
+  const month = displayDate.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startWeekday = firstDayOfMonth.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const activeSet = new Set(calendarActiveDates || []);
+  const todayStr = formatDateISO(new Date());
+
+  titleEl.textContent = displayDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
+  bodyEl.innerHTML = '';
+
+  let dayCounter = 1 - startWeekday;
+  for (let rowIndex = 0; rowIndex < 6; rowIndex += 1) {
+    const row = document.createElement('tr');
+    for (let columnIndex = 0; columnIndex < 7; columnIndex += 1) {
+      const cell = document.createElement('td');
+      cell.className = 'p-1 md:p-2 border border-gray-200 text-xs md:text-sm';
+      const current = new Date(year, month, dayCounter);
+      const currentMonth = current.getMonth() === month;
+      if (!currentMonth) {
+        cell.classList.add('bg-gray-50', 'text-gray-300');
+        cell.textContent = current.getDate();
+      } else {
+        const currentStr = formatDateISO(current);
+        cell.textContent = current.getDate();
+        if (latestSummaryRange) {
+          if (currentStr < latestSummaryRange.start || currentStr > latestSummaryRange.end) {
+            cell.classList.add('calendar-day-disabled');
+          }
+        }
+        if (activeSet.has(currentStr)) {
+          cell.classList.add('calendar-day-active');
+        }
+        if (currentStr === todayStr) {
+          cell.classList.add('calendar-day-today');
+        }
+      }
+      row.appendChild(cell);
+      dayCounter += 1;
+    }
+    bodyEl.appendChild(row);
+  }
+}
+
+async function displaySubjectSummary(subjectCode, subjectName) {
+  await waitForAuth();
+  if (!subjectCode) {
+    Swal.fire('ข้อมูลไม่ครบ', 'ไม่สามารถโหลดสรุปรายวิชาได้ เนื่องจากไม่ทราบรหัสวิชา', 'warning');
+    return;
+  }
+
+  Swal.fire({ title: 'กำลังโหลดสรุปรายวิชา...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try {
+    const attendanceSnapshot = await database.ref('attendance').once('value');
+    const totals = { present: 0, absent: 0, sick: 0, activity: 0, late: 0 };
+    const perRoomStats = {};
+
+    if (attendanceSnapshot.exists()) {
+      attendanceSnapshot.forEach(dateSnap => {
+        const subjectSnap = dateSnap.child(subjectCode);
+        if (!subjectSnap.exists()) return;
+        subjectSnap.forEach(roomSnap => {
+          const roomKey = roomSnap.key;
+          const roomData = roomSnap.val() || {};
+          if (!perRoomStats[roomKey]) {
+            perRoomStats[roomKey] = { present: 0, absent: 0, sick: 0, activity: 0, late: 0 };
+          }
+          Object.values(roomData).forEach(entry => {
+            const status = entry && entry.status ? entry.status : 'ข';
+            switch (status) {
+              case 'ม':
+                totals.present += 1;
+                perRoomStats[roomKey].present += 1;
+                break;
+              case 'ป':
+                totals.sick += 1;
+                perRoomStats[roomKey].sick += 1;
+                break;
+              case 'ก':
+                totals.activity += 1;
+                perRoomStats[roomKey].activity += 1;
+                break;
+              case 'ส':
+                totals.late += 1;
+                perRoomStats[roomKey].late += 1;
+                break;
+              case 'ข':
+              default:
+                totals.absent += 1;
+                perRoomStats[roomKey].absent += 1;
+                break;
+            }
+          });
+        });
+      });
+    }
+
+    const roomArray = Object.entries(perRoomStats).map(([room, stats]) => {
+      const totalRecords = stats.present + stats.absent + stats.sick + stats.activity + stats.late;
+      const effectivePresent = stats.present + stats.sick + stats.activity;
+      const percent = totalRecords > 0 ? (effectivePresent / totalRecords) * 100 : 0;
+      return { room, percent };
+    }).sort((a, b) => a.room.localeCompare(b.room, 'th')); // alphabetical order by room
+
+    renderSubjectOverallChart(totals);
+    renderSubjectByRoomChart(roomArray);
+
+    document.getElementById('subject-summary-content').classList.remove('hidden');
+    document.getElementById('selected-subject-name-display').textContent = subjectName || getSubjectNameFromCode(subjectCode);
+    document.getElementById('print-selected-subject-name').textContent = subjectName || getSubjectNameFromCode(subjectCode);
+    Swal.close();
+  } catch (error) {
+    Swal.close();
+    Swal.fire('ผิดพลาด', `ไม่สามารถโหลดสรุปรายวิชาได้: ${error.message}`, 'error');
+  }
+}
+
+function renderSubjectOverallChart(totals) {
+  const canvas = document.getElementById('subject-attendance-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  if (window.subjectAttendanceChartInstance) {
+    window.subjectAttendanceChartInstance.destroy();
+  }
+  const dataValues = [totals.present, totals.absent, totals.sick, totals.activity, totals.late];
+  const hasData = dataValues.some(value => value > 0);
+  const dataset = hasData ? dataValues : [0, 0, 0, 0, 0];
+  window.subjectAttendanceChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['มา', 'ขาด', 'ป่วย', 'กิจ', 'สาย'],
+      datasets: [{
+        data: dataset,
+        backgroundColor: ['#22c55e', '#ef4444', '#facc15', '#38bdf8', '#f97316']
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+}
+
+function renderSubjectByRoomChart(roomArray) {
+  const canvas = document.getElementById('subject-class-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  if (window.subjectClassChartInstance) {
+    window.subjectClassChartInstance.destroy();
+  }
+  const labels = roomArray.length ? roomArray.map(item => item.room) : ['ไม่มีข้อมูล'];
+  const data = roomArray.length ? roomArray.map(item => Number(formatPercent(item.percent))) : [0];
+  window.subjectClassChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '% การมาเรียนเฉลี่ยต่อห้อง',
+        data,
+        backgroundColor: '#6366f1'
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, max: 100 }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: context => `${context.parsed.y?.toFixed?.(1) ?? context.parsed.y}%`
+          }
+        }
+      }
+    }
+  });
 }
 
 function setupModalControls() {
