@@ -380,6 +380,7 @@
         <h3 class="text-lg font-bold mb-4">นำเข้าข้อมูลนักเรียนจาก CSV</h3>
         <div class="mb-4"><label class="block text-gray-700 mb-1">เลือกไฟล์ CSV (UTF-8):</label><input type="file" id="csv-file" accept=".csv" class="w-full px-4 py-2 border rounded"><p class="text-sm text-gray-500 mt-1">หัวตารางที่ถูกต้อง: รหัสนักเรียน, ห้อง, เลขที่, ชื่อจริง, ชื่อเล่น, ที่อยู่อีเมล</p></div>
         <div id="csv-preview" class="mb-4 hidden"><h4 class="font-semibold mb-2">ตัวอย่าง (5 แถวแรก):</h4><div class="overflow-x-auto max-h-60 border"><table class="min-w-full bg-white"><thead id="csv-preview-header" class="bg-gray-100"></thead><tbody id="csv-preview-body"></tbody></table></div></div>
+        <div id="csv-feedback" class="text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-2"><button type="button" id="cancel-import-csv" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">ยกเลิก</button><button type="button" id="confirm-import-csv" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400" disabled>ยืนยันนำเข้า</button></div>
       </div>
     </div>
@@ -627,6 +628,374 @@ function downloadCsv(filename, rows) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+const CSV_HEADER_ALIASES = {
+  studentId: ['รหัสนักเรียน', 'student id', 'student_id', 'id'],
+  room: ['ห้อง', 'ห้องเรียน', 'room', 'class'],
+  number: ['เลขที่', 'ลำดับ', 'number', 'no'],
+  name: ['ชื่อจริง', 'ชื่อ-นามสกุล', 'ชื่อนักเรียน', 'name', 'fullname'],
+  nickname: ['ชื่อเล่น', 'nickname'],
+  email: ['ที่อยู่อีเมล', 'อีเมล', 'email', 'e-mail'],
+  yearBE: ['ปีการศึกษา', 'ปีการศึกษา (พ.ศ.)', 'ปี', 'academic year', 'year'],
+  semesters: ['ภาคเรียน', 'ภาคเรียนที่ลงทะเบียน', 'semester', 'semesters']
+};
+const CSV_FIELD_LABELS = {
+  studentId: 'รหัสนักเรียน',
+  room: 'ห้อง',
+  number: 'เลขที่',
+  name: 'ชื่อ-นามสกุล',
+  nickname: 'ชื่อเล่น',
+  email: 'ที่อยู่อีเมล',
+  yearBE: 'ปีการศึกษา (พ.ศ.)',
+  semesters: 'ภาคเรียน'
+};
+const REQUIRED_CSV_FIELDS = ['studentId', 'room', 'number', 'name'];
+let pendingCsvImportRecords = [];
+let pendingCsvImportMeta = { total: 0, skipped: 0 };
+
+function normalizeHeaderLookup(headerRow) {
+  const lookup = {};
+  headerRow.forEach((header, index) => {
+    const normalizedHeader = String(header || '').trim().toLowerCase();
+    if (!normalizedHeader) return;
+    Object.entries(CSV_HEADER_ALIASES).forEach(([field, aliases]) => {
+      aliases.forEach(alias => {
+        if (normalizedHeader === alias.toLowerCase()) {
+          if (!(field in lookup)) {
+            lookup[field] = index;
+          }
+        }
+      });
+    });
+  });
+  return lookup;
+}
+
+function parseCsvText(text) {
+  const rows = [];
+  let current = '';
+  let row = [];
+  let insideQuotes = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    if (char === '"') {
+      if (insideQuotes && nextChar === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (char === ',' && !insideQuotes) {
+      row.push(current);
+      current = '';
+    } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i += 1;
+      }
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseSemestersFromCsv(value) {
+  if (value === null || value === undefined) return [CURRENT_SEMESTER];
+  const text = String(value).trim();
+  if (!text) return [CURRENT_SEMESTER];
+  if (text.match(/ทั้งปี|both/i)) {
+    return [1, 2];
+  }
+  const matches = text.match(/[12]/g);
+  if (matches && matches.length) {
+    const unique = Array.from(new Set(matches.map(num => Number(num)))).filter(n => n === 1 || n === 2);
+    return unique.length ? unique.sort((a, b) => a - b) : [CURRENT_SEMESTER];
+  }
+  return [CURRENT_SEMESTER];
+}
+
+function sanitizeStudentCsvRow(rawRow, headerLookup, rowIndex) {
+  const getValue = (field) => {
+    const idx = headerLookup[field];
+    if (idx === undefined) return '';
+    return rawRow[idx] !== undefined ? String(rawRow[idx]).trim() : '';
+  };
+
+  const studentId = getValue('studentId');
+  const roomRaw = getValue('room');
+  const numberRaw = getValue('number');
+  const name = getValue('name');
+
+  if (!studentId && !roomRaw && !numberRaw && !name) {
+    return { skip: true };
+  }
+
+  const errors = [];
+  if (!studentId) errors.push('ไม่มีรหัสนักเรียน');
+  if (!roomRaw) errors.push('ไม่มีห้องเรียน');
+  if (!numberRaw) errors.push('ไม่มีเลขที่');
+  if (!name) errors.push('ไม่มีชื่อ-นามสกุล');
+
+  const room = standardizeRoomCode(roomRaw);
+  if (!room) {
+    errors.push('ห้องไม่ถูกต้อง');
+  }
+
+  const number = numberRaw ? String(numberRaw).trim() : '';
+  const nickname = getValue('nickname');
+  const email = getValue('email');
+
+  const yearValue = getValue('yearBE');
+  let yearBE = Number(yearValue);
+  if (!Number.isFinite(yearBE) || yearBE < 2400 || yearBE > 3100) {
+    yearBE = CURRENT_YEAR_BE;
+  }
+
+  const semestersValue = getValue('semesters');
+  const semesters = parseSemestersFromCsv(semestersValue);
+
+  if (errors.length) {
+    return { errors, rowIndex };
+  }
+
+  return {
+    data: {
+      studentId,
+      room,
+      number,
+      name,
+      nickname,
+      email,
+      yearBE,
+      semesters
+    }
+  };
+}
+
+function resetCsvModalState() {
+  pendingCsvImportRecords = [];
+  pendingCsvImportMeta = { total: 0, skipped: 0 };
+  const fileInput = document.getElementById('csv-file');
+  const preview = document.getElementById('csv-preview');
+  const headerEl = document.getElementById('csv-preview-header');
+  const bodyEl = document.getElementById('csv-preview-body');
+  const feedbackEl = document.getElementById('csv-feedback');
+  const confirmBtn = document.getElementById('confirm-import-csv');
+  if (fileInput) fileInput.value = '';
+  if (preview) preview.classList.add('hidden');
+  if (headerEl) headerEl.innerHTML = '';
+  if (bodyEl) bodyEl.innerHTML = '';
+  if (feedbackEl) {
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'text-sm mt-2 hidden';
+  }
+  if (confirmBtn) confirmBtn.disabled = true;
+}
+
+function updateCsvPreviewDisplay(records, errors) {
+  const preview = document.getElementById('csv-preview');
+  const headerEl = document.getElementById('csv-preview-header');
+  const bodyEl = document.getElementById('csv-preview-body');
+  const feedbackEl = document.getElementById('csv-feedback');
+  const confirmBtn = document.getElementById('confirm-import-csv');
+
+  if (!preview || !headerEl || !bodyEl || !feedbackEl || !confirmBtn) {
+    return;
+  }
+
+  if (!records.length) {
+    preview.classList.add('hidden');
+    confirmBtn.disabled = true;
+  } else {
+    preview.classList.remove('hidden');
+    confirmBtn.disabled = false;
+    headerEl.innerHTML = '<tr><th class="py-2 px-3 border text-left">รหัสนักเรียน</th><th class="py-2 px-3 border text-left">ชื่อ</th><th class="py-2 px-3 border text-left">ห้อง</th><th class="py-2 px-3 border text-left">เลขที่</th><th class="py-2 px-3 border text-left">ภาคเรียน</th><th class="py-2 px-3 border text-left">ปีการศึกษา</th></tr>';
+    bodyEl.innerHTML = '';
+    records.slice(0, 5).forEach(record => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td class="py-2 px-3 border">${escapeHtml(record.studentId)}</td>
+        <td class="py-2 px-3 border">${escapeHtml(record.name)}</td>
+        <td class="py-2 px-3 border">${escapeHtml(record.room)}</td>
+        <td class="py-2 px-3 border">${escapeHtml(record.number)}</td>
+        <td class="py-2 px-3 border">${record.semesters.map(sem => `ภาคเรียนที่ ${sem}`).join('<br>')}</td>
+        <td class="py-2 px-3 border">${escapeHtml(record.yearBE)}</td>`;
+      bodyEl.appendChild(row);
+    });
+  }
+
+  if (errors.length) {
+    feedbackEl.textContent = errors.slice(0, 3).join('\n');
+    feedbackEl.className = 'text-sm mt-2 text-red-600 whitespace-pre-line';
+    feedbackEl.classList.remove('hidden');
+    if (errors.length > 3) {
+      feedbackEl.textContent += `\n...พบข้อผิดพลาดเพิ่มเติมอีก ${errors.length - 3} แถว`;
+    }
+  } else if (records.length) {
+    feedbackEl.textContent = `พร้อมนำเข้าจำนวน ${records.length} รายการ`;
+    feedbackEl.className = 'text-sm mt-2 text-green-600';
+    feedbackEl.classList.remove('hidden');
+  } else {
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'text-sm mt-2 hidden';
+  }
+}
+
+function handleCsvFileSelection(event) {
+  const file = event.target?.files?.[0];
+  resetCsvModalState();
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const rawText = (e.target?.result || '').toString().replace(/^\ufeff/, '');
+      const rows = parseCsvText(rawText).filter(row => row.some(cell => String(cell || '').trim() !== ''));
+      if (!rows.length) {
+        Swal.fire('ไฟล์ว่างเปล่า', 'ไม่พบข้อมูลในไฟล์ CSV', 'warning');
+        resetCsvModalState();
+        return;
+      }
+      const headerRow = rows[0];
+      const headerLookup = normalizeHeaderLookup(headerRow);
+
+      const missingFields = REQUIRED_CSV_FIELDS.filter(field => !(field in headerLookup));
+      if (missingFields.length) {
+        const missingLabels = missingFields.map(field => CSV_FIELD_LABELS[field] || field).join(', ');
+        Swal.fire('หัวตารางไม่ถูกต้อง', `ไฟล์ต้องมีคอลัมน์: ${missingLabels}`, 'error');
+        resetCsvModalState();
+        return;
+      }
+
+      const validRecords = [];
+      const errors = [];
+      const seenStudentIds = new Set();
+
+      rows.slice(1).forEach((rawRow, index) => {
+        const sanitized = sanitizeStudentCsvRow(rawRow, headerLookup, index + 2);
+        if (sanitized.skip) {
+          return;
+        }
+        if (sanitized.errors) {
+          errors.push(`แถวที่ ${sanitized.rowIndex}: ${sanitized.errors.join(', ')}`);
+          return;
+        }
+        const record = sanitized.data;
+        const key = record.studentId;
+        if (seenStudentIds.has(key)) {
+          errors.push(`แถวที่ ${index + 2}: รหัสนักเรียน ${key} ซ้ำในไฟล์`);
+          return;
+        }
+        seenStudentIds.add(key);
+        validRecords.push(record);
+      });
+
+      pendingCsvImportRecords = validRecords;
+      pendingCsvImportMeta = { total: validRecords.length, skipped: errors.length };
+      updateCsvPreviewDisplay(validRecords, errors);
+
+      if (!validRecords.length) {
+        const feedbackEl = document.getElementById('csv-feedback');
+        if (feedbackEl) {
+          feedbackEl.textContent = 'ไม่พบแถวที่พร้อมนำเข้า กรุณาตรวจสอบไฟล์อีกครั้ง';
+          feedbackEl.className = 'text-sm mt-2 text-red-600';
+          feedbackEl.classList.remove('hidden');
+        }
+      }
+    } catch (error) {
+      console.error('CSV parse failed', error);
+      Swal.fire('ผิดพลาด', 'ไม่สามารถอ่านไฟล์ CSV ได้ กรุณาลองใหม่', 'error');
+      resetCsvModalState();
+    }
+  };
+  reader.onerror = () => {
+    Swal.fire('ผิดพลาด', 'ไม่สามารถเปิดไฟล์ CSV ได้', 'error');
+    resetCsvModalState();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+async function handleConfirmImportCsv() {
+  if (!pendingCsvImportRecords.length) {
+    Swal.fire('ไม่มีข้อมูล', 'กรุณาเลือกไฟล์ CSV ที่ต้องการนำเข้า', 'info');
+    return;
+  }
+
+  await waitForAuth();
+
+  const { skipped } = pendingCsvImportMeta;
+
+  Swal.fire({
+    title: 'กำลังนำเข้า...',
+    html: 'ระบบกำลังบันทึกข้อมูลนักเรียน กรุณารอสักครู่',
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading()
+  });
+
+  try {
+    const snapshot = await database.ref('students').once('value');
+    const existingByStudentId = {};
+    if (snapshot.exists()) {
+      snapshot.forEach(child => {
+        const value = child.val();
+        const key = child.key;
+        const studentId = value?.studentId ? String(value.studentId).trim() : '';
+        if (studentId) {
+          existingByStudentId[studentId] = { key, value };
+        }
+      });
+    }
+
+    const updates = {};
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    pendingCsvImportRecords.forEach(record => {
+      const existing = existingByStudentId[record.studentId];
+      if (existing) {
+        const payload = { ...existing.value, ...record, firebaseKey: existing.key };
+        updates[`students/${existing.key}`] = payload;
+        updatedCount += 1;
+      } else {
+        const newRef = database.ref('students').push();
+        const newKey = newRef.key;
+        updates[`students/${newKey}`] = { ...record, firebaseKey: newKey };
+        addedCount += 1;
+      }
+    });
+
+    const updatePaths = Object.keys(updates);
+    if (!updatePaths.length) {
+      Swal.close();
+      Swal.fire('ไม่มีข้อมูลใหม่', 'ไม่พบข้อมูลที่ต้องบันทึกจากไฟล์ CSV', 'info');
+      return;
+    }
+
+    await database.ref().update(updates);
+
+    const totalImported = pendingCsvImportRecords.length;
+    Swal.fire('สำเร็จ', `นำเข้าข้อมูลนักเรียน ${totalImported} รายการ (เพิ่ม ${addedCount} คน, อัปเดต ${updatedCount} คน${skipped ? `, ข้าม ${skipped} แถว` : ''})`, 'success');
+
+    document.getElementById('import-csv-modal').classList.add('hidden');
+    resetCsvModalState();
+    loadAllStudentsData();
+    populateRoomsFromStudents();
+  } catch (error) {
+    console.error('CSV import failed', error);
+    Swal.fire('ผิดพลาด', `นำเข้าไม่สำเร็จ: ${error.message}`, 'error');
+  }
 }
 
 function updateGlobalTermDisplay() {
@@ -2667,7 +3036,28 @@ function setupModalControls() {
   });
 
   // CSV modal
-  document.getElementById('import-csv-btn').addEventListener('click', () => { document.getElementById('csv-file').value = ''; document.getElementById('csv-preview').classList.add('hidden'); document.getElementById('confirm-import-csv').disabled = true; document.getElementById('import-csv-modal').classList.remove('hidden'); }); document.getElementById('cancel-import-csv').addEventListener('click', () => document.getElementById('import-csv-modal').classList.add('hidden'));
+  const importCsvBtn = document.getElementById('import-csv-btn');
+  if (importCsvBtn) {
+    importCsvBtn.addEventListener('click', () => {
+      resetCsvModalState();
+      document.getElementById('import-csv-modal').classList.remove('hidden');
+    });
+  }
+  const cancelImportCsvBtn = document.getElementById('cancel-import-csv');
+  if (cancelImportCsvBtn) {
+    cancelImportCsvBtn.addEventListener('click', () => {
+      document.getElementById('import-csv-modal').classList.add('hidden');
+      resetCsvModalState();
+    });
+  }
+  const csvFileInput = document.getElementById('csv-file');
+  if (csvFileInput) {
+    csvFileInput.addEventListener('change', handleCsvFileSelection);
+  }
+  const confirmImportCsvBtn = document.getElementById('confirm-import-csv');
+  if (confirmImportCsvBtn) {
+    confirmImportCsvBtn.addEventListener('click', handleConfirmImportCsv);
+  }
   const closeHistoryBtn = document.getElementById('close-student-history');
   if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', closeStudentHistoryModal);
   const downloadHistoryBtn = document.getElementById('download-student-history-csv');
