@@ -58,7 +58,12 @@
 </head>
 <body>
   <header class="bg-blue-800 text-white py-4 px-6 shadow-md no-print">
-    <div class="container mx-auto"><h1 class="text-2xl font-bold">ระบบบริหารข้อมูลนักเรียน</h1><h2 class="text-lg">วิชาภาษาไทย ชั้นมัธยมศึกษาปีที่ 5 ปีการศึกษา 2568</h2></div>
+    <div class="container mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+      <div>
+        <h1 class="text-2xl font-bold">ระบบบริหารข้อมูลนักเรียน</h1>
+        <p id="global-term-display" class="text-sm text-blue-100"></p>
+      </div>
+    </div>
   </header>
   <nav class="bg-blue-700 text-white shadow-md no-print">
     <div class="container mx-auto px-6 py-3">
@@ -229,7 +234,8 @@
               <tbody id="summary-list"></tbody>
             </table>
           </div>
-          <div class="mt-6 flex justify-end no-print">
+          <div class="mt-6 flex justify-end gap-2 no-print">
+            <button id="download-summary-csv" class="px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">ดาวน์โหลด CSV</button>
             <button id="print-summary" class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">พิมพ์รายงาน</button>
           </div>
         </div>
@@ -252,10 +258,15 @@
           <table class="min-w-full bg-white border">
             <thead>
               <tr class="bg-gray-100">
-                <th class="py-2 px-4 border">รหัสนักเรียน</th><th class="py-2 px-4 border">ห้อง</th>
-                <th class="py-2 px-4 border">เลขที่</th><th class="py-2 px-4 border">ชื่อ-นามสกุล</th>
-                <th class="py-2 px-4 border">ชื่อเล่น</th><th class="py-2 px-4 border">อีเมล</th>
-                <th class="py-2 px-4 border">% การเข้าเรียนรวม</th> <th class="py-2 px-4 border">จัดการ</th>
+                <th class="py-2 px-4 border">รหัสนักเรียน</th>
+                <th class="py-2 px-4 border">ห้อง</th>
+                <th class="py-2 px-4 border">เลขที่</th>
+                <th class="py-2 px-4 border">ชื่อ-นามสกุล</th>
+                <th class="py-2 px-4 border">ชื่อเล่น</th>
+                <th class="py-2 px-4 border">อีเมล</th>
+                <th class="py-2 px-4 border">ภาคเรียนที่ลงทะเบียน</th>
+                <th class="py-2 px-4 border">% การเข้าเรียนรวม</th>
+                <th class="py-2 px-4 border">จัดการ</th>
               </tr>
             </thead>
             <tbody id="all-students-list"></tbody>
@@ -286,7 +297,10 @@
             <div><h4 class="font-medium mb-2">สถิติรวม (ทุกห้อง)</h4><div class="h-64"><canvas id="subject-attendance-chart"></canvas></div></div>
             <div><h4 class="font-medium mb-2">สถิติรายห้อง (% การมาเรียน)</h4><div class="h-64"><canvas id="subject-class-chart"></canvas></div></div>
           </div>
-          <div class="flex justify-end no-print"><button id="print-subject-summary" class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">พิมพ์รายงาน</button></div>
+          <div class="flex justify-end gap-2 no-print">
+            <button id="download-subject-summary-csv" class="px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">ดาวน์โหลด CSV</button>
+            <button id="print-subject-summary" class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">พิมพ์รายงาน</button>
+          </div>
         </div>
       </div>
     </div>
@@ -303,6 +317,15 @@
           <div class="mb-4"><label class="block text-gray-700 mb-1">ชื่อจริง (ชื่อ-นามสกุล):</label><input type="text" id="student-name" class="w-full px-4 py-2 border rounded" required></div>
           <div class="mb-4"><label class="block text-gray-700 mb-1">ชื่อเล่น:</label><input type="text" id="student-nickname" class="w-full px-4 py-2 border rounded"></div>
           <div class="mb-4"><label class="block text-gray-700 mb-1">ที่อยู่อีเมล:</label><input type="email" id="student-email" class="w-full px-4 py-2 border rounded"></div>
+          <div class="mb-4"><label class="block text-gray-700 mb-1">ปีการศึกษา (พ.ศ.):</label><input type="number" id="student-yearbe" class="w-full px-4 py-2 border rounded" value="2568" required></div>
+          <div class="mb-4">
+            <label class="block text-gray-700 mb-1">ภาคเรียนที่ลงทะเบียน:</label>
+            <div class="flex flex-wrap gap-4">
+              <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="student-semesters" value="1" class="h-4 w-4"> ภาคเรียนที่ 1</label>
+              <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="student-semesters" value="2" class="h-4 w-4"> ภาคเรียนที่ 2</label>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">เลือกได้มากกว่า 1 ภาคเรียน หากนักเรียนเรียนทั้งปีการศึกษา</p>
+          </div>
           <div class="flex justify-end gap-2"><button type="button" id="cancel-add-student" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">ยกเลิก</button><button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">บันทึก</button></div>
         </form>
       </div>
@@ -368,7 +391,10 @@
             <h3 class="text-lg font-bold">สถิติย้อนหลังนักเรียน</h3>
             <p id="student-history-name" class="text-sm text-gray-600"></p>
           </div>
-          <button type="button" id="close-student-history" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+          <div class="flex items-center gap-2">
+            <button type="button" id="download-student-history-csv" class="hidden px-3 py-1 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700">ดาวน์โหลด CSV</button>
+            <button type="button" id="close-student-history" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+          </div>
         </div>
         <div id="student-history-loading" class="py-6 text-center text-gray-500">กำลังโหลดข้อมูล...</div>
         <div id="student-history-empty" class="py-6 text-center text-gray-500 hidden">ยังไม่มีข้อมูลการเช็คชื่อของนักเรียนคนนี้</div>
@@ -448,7 +474,7 @@ firebase.auth().signInAnonymously().catch(err => {
 firebase.auth().onAuthStateChanged(user => { if (user) console.log('[AUTH] Signed in anonymously:', user.uid); });
 
 // ================= TERM CONFIG =================
-const CURRENT_SEMESTER = 1;      // 1 หรือ 2
+const CURRENT_SEMESTER = 2;      // 1 หรือ 2
 const CURRENT_YEAR_BE  = 2568;   // พ.ศ. ของภาคเรียนปัจจุบัน
 
 function isSubjectInCurrentTerm(subj) {
@@ -528,8 +554,261 @@ function createDateRange(startValue, endValue) {
 }
 function formatPercent(value) { return Number.isFinite(value) ? value.toFixed(1) : '0.0'; }
 
+function normalizeStudentSemesters(rawValue) {
+  const semestersSet = new Set();
+  if (Array.isArray(rawValue)) {
+    rawValue.forEach(val => {
+      const num = Number(val);
+      if (num === 1 || num === 2) semestersSet.add(num);
+    });
+  } else if (rawValue && typeof rawValue === 'object') {
+    Object.keys(rawValue).forEach(key => {
+      const numericKey = Number(key);
+      const numericValue = Number(rawValue[key]);
+      if (numericKey === 1 || numericKey === 2) {
+        semestersSet.add(numericKey);
+      } else if (numericValue === 1 || numericValue === 2) {
+        semestersSet.add(numericValue);
+      } else if (rawValue[key] === true && (numericKey === 1 || numericKey === 2)) {
+        semestersSet.add(numericKey);
+      }
+    });
+  } else if (typeof rawValue === 'string') {
+    rawValue.split(',').map(part => Number(part.trim())).forEach(num => {
+      if (num === 1 || num === 2) semestersSet.add(num);
+    });
+  } else {
+    const num = Number(rawValue);
+    if (num === 1 || num === 2) semestersSet.add(num);
+  }
+
+  if (semestersSet.size === 0) {
+    semestersSet.add(CURRENT_SEMESTER);
+  }
+  return Array.from(semestersSet).sort((a, b) => a - b);
+}
+
+function describeStudentSemesters(semesters) {
+  if (!Array.isArray(semesters) || semesters.length === 0) return `ภาคเรียนที่ ${CURRENT_SEMESTER}`;
+  const unique = Array.from(new Set(semesters.filter(n => n === 1 || n === 2))).sort((a, b) => a - b);
+  if (unique.length === 2) {
+    return 'ภาคเรียนที่ 1 และ 2';
+  }
+  return `ภาคเรียนที่ ${unique[0]}`;
+}
+
+function studentMatchesTerm(student, semester, year) {
+  const targetSemester = (semester === 1 || semester === 2) ? semester : CURRENT_SEMESTER;
+  const targetYear = Number.isFinite(Number(year)) ? Number(year) : CURRENT_YEAR_BE;
+  const studentYear = Number.isFinite(Number(student.yearBE)) ? Number(student.yearBE) : CURRENT_YEAR_BE;
+  if (studentYear !== targetYear) return false;
+  const semesters = normalizeStudentSemesters(student.semesters);
+  return semesters.includes(targetSemester);
+}
+
+function escapeCsvValue(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  const escaped = text.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+function downloadCsv(filename, rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    Swal.fire('ไม่มีข้อมูล', 'ไม่พบข้อมูลสำหรับบันทึกเป็น CSV', 'info');
+    return;
+  }
+  const csvContent = rows.map(row => (Array.isArray(row) ? row.map(escapeCsvValue).join(',') : '')).join('\r\n');
+  const blob = new Blob(['\ufeff', csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function updateGlobalTermDisplay() {
+  const banner = document.getElementById('global-term-display');
+  if (!banner) return;
+  const semester = (selectedSemesterForAttendance === 1 || selectedSemesterForAttendance === 2)
+    ? selectedSemesterForAttendance
+    : CURRENT_SEMESTER;
+  const year = Number.isFinite(Number(selectedYearForAttendance))
+    ? Number(selectedYearForAttendance)
+    : CURRENT_YEAR_BE;
+  banner.textContent = `ภาคเรียนที่ ${semester} ปีการศึกษา ${year}`;
+}
+
+function handleDownloadSummaryCsv() {
+  if (!latestSummaryResult) {
+    Swal.fire('ยังไม่มีข้อมูล', 'กรุณาสร้างสรุปผลก่อนดาวน์โหลด CSV', 'info');
+    return;
+  }
+  const data = latestSummaryResult;
+  const rows = [
+    ['รายงานสรุปผลการเข้าเรียน'],
+    ['ห้องเรียน', `ห้อง ${data.room}`],
+    ['รายวิชา', data.subjectName || data.subjectCode],
+    ['ภาคเรียน', data.semester],
+    ['ปีการศึกษา (พ.ศ.)', data.year],
+    ['ช่วงวันที่', `${data.startDate} ถึง ${data.endDate}`],
+    ['จำนวนนักเรียนทั้งหมด', data.totalStudents],
+    ['จำนวนวันที่มีการเช็คชื่อ', data.totalDays],
+    ['% การเข้าเรียนเฉลี่ย', `${formatPercent(data.averageAttendance)}%`],
+    ['ขาดเรียนรวมสูงสุด (คนเดียว)', data.maxEffectiveAbsent],
+    ['มาสายรวมสูงสุด (คนเดียว)', data.maxLate],
+    ['จำนวนมาทั้งหมด', data.totalsByStatus.present],
+    ['จำนวนขาดทั้งหมด', data.totalsByStatus.absent],
+    ['จำนวนป่วยทั้งหมด', data.totalsByStatus.sick],
+    ['จำนวนกิจกรรมทั้งหมด', data.totalsByStatus.activity],
+    ['จำนวนสายทั้งหมด', data.totalsByStatus.late],
+    []
+  ];
+
+  rows.push(['ตารางสรุปผลการเข้าเรียนรายบุคคล']);
+  rows.push(['เลขที่', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'มา', 'ขาด', 'ป่วย', 'กิจกรรม', 'สาย', 'เข้าเรียนจริง (%)']);
+  data.studentSummaries.forEach(item => {
+      rows.push([
+        item.number,
+        item.studentId,
+        item.name,
+        item.present,
+        item.absent,
+        item.sick,
+        item.activity,
+        item.late,
+        `${item.attendancePercent}%`
+      ]);
+  });
+
+  if (data.lowAttendanceList.length) {
+    rows.push([]);
+    rows.push(['นักเรียนที่เข้าเรียนน้อยกว่ากำหนด (ขาดเกิน 20%)']);
+    rows.push(['เลขที่', 'ชื่อ', '% การขาด']);
+    data.lowAttendanceList.forEach(item => {
+      rows.push([item.number, item.name, `${item.absentPercent}%`]);
+    });
+  }
+
+  if (data.frequentAbsencesList.length) {
+    rows.push([]);
+    rows.push(['นักเรียนที่ขาดเรียนบ่อย']);
+    rows.push(['เลขที่', 'ชื่อ', 'จำนวนครั้ง']);
+    data.frequentAbsencesList.forEach(item => {
+      rows.push([item.number, item.name, item.value]);
+    });
+  }
+
+  if (data.frequentLatesList.length) {
+    rows.push([]);
+    rows.push(['นักเรียนที่มาสายบ่อย']);
+    rows.push(['เลขที่', 'ชื่อ', 'จำนวนครั้ง']);
+    data.frequentLatesList.forEach(item => {
+      rows.push([item.number, item.name, item.value]);
+    });
+  }
+
+  if (data.dailyStats.length) {
+    rows.push([]);
+    rows.push(['สรุปรายวันของห้องเรียน']);
+    rows.push(['วันที่', '% การเข้าเรียน', 'มา', 'ป่วย/กิจกรรม', 'ขาด', 'สาย']);
+    data.dailyStats.forEach(item => {
+      rows.push([item.date, `${item.attendancePercent}%`, item.present, item.excused, item.absent, item.late]);
+    });
+  }
+
+  const filename = `attendance-summary-${data.room}-${data.subjectCode}-${data.startDate}.csv`;
+  downloadCsv(filename, rows);
+}
+
+function handleDownloadSubjectSummaryCsv() {
+  if (!latestSubjectSummary) {
+    Swal.fire('ยังไม่มีข้อมูล', 'กรุณาเปิดสรุปรายวิชาก่อนดาวน์โหลด CSV', 'info');
+    return;
+  }
+  const data = latestSubjectSummary;
+  const rows = [
+    ['รายงานสรุปรายวิชา'],
+    ['รายวิชา', data.subjectName || data.subjectCode],
+    ['รหัสวิชา', data.subjectCode],
+    ['ภาคเรียน', data.semester],
+    ['ปีการศึกษา (พ.ศ.)', data.year],
+    [],
+    ['สถิติรวม (ทุกห้อง)'],
+    ['มา', data.totals.present],
+    ['ขาด', data.totals.absent],
+    ['ป่วย', data.totals.sick],
+    ['กิจกรรม', data.totals.activity],
+    ['สาย', data.totals.late],
+    []
+  ];
+
+  rows.push(['สถิติรายห้อง (% การมาเรียน)']);
+  rows.push(['ห้องเรียน', '% การมาเรียนเฉลี่ย']);
+  if (data.roomStats.length) {
+    data.roomStats.forEach(item => {
+      rows.push([item.room, `${formatPercent(item.percent)}%`]);
+    });
+  } else {
+    rows.push(['-', '0%']);
+  }
+
+  const filename = `subject-summary-${data.subjectCode}.csv`;
+  downloadCsv(filename, rows);
+}
+
+function handleDownloadStudentHistoryCsv() {
+  if (!latestStudentHistory || !latestStudentHistory.history.length) {
+    Swal.fire('ยังไม่มีข้อมูล', 'ยังไม่มีประวัติการเช็คชื่อสำหรับนักเรียนคนนี้', 'info');
+    return;
+  }
+  const data = latestStudentHistory;
+  const rows = [
+    ['ประวัติการเข้าเรียนของนักเรียน'],
+    ['ชื่อนักเรียน', data.studentName],
+    ['รหัสนักเรียน', data.studentId],
+    ['ห้อง', data.room || '-'],
+    ['เลขที่', data.number || '-'],
+    ['ปีการศึกษา (พ.ศ.)', data.yearBE || CURRENT_YEAR_BE],
+    ['ภาคเรียน', describeStudentSemesters(data.semesters)],
+    []
+  ];
+
+  if (data.summaryItems && data.summaryItems.length) {
+    rows.push(['สรุปสถิติ']);
+    data.summaryItems.forEach(item => {
+      rows.push([item.label, item.value]);
+    });
+    rows.push([]);
+  }
+
+  rows.push(['ประวัติการเช็คชื่อ']);
+  rows.push(['วันที่', 'รายวิชา', 'ห้อง', 'สถานะ', 'หมายเหตุ']);
+  data.history.forEach(entry => {
+    rows.push([entry.date, entry.subjectDisplay, entry.room, getStatusLabel(entry.status), entry.remark || '']);
+  });
+
+  const filename = `student-history-${data.studentId}.csv`;
+  downloadCsv(filename, rows);
+}
+
 async function handleEditStudentModal(event) {
-  await waitForAuth(); const studentKey = event.target.dataset.key; database.ref(`students/${studentKey}`).once('value') .then(snapshot => { if (snapshot.exists()) { const data = snapshot.val(); document.getElementById('student-firebase-key-edit').value = studentKey; document.getElementById('student-id').value = data.studentId || ''; document.getElementById('student-room').value = data.room; document.getElementById('student-number').value = data.number; document.getElementById('student-name').value = data.name; document.getElementById('student-nickname').value = data.nickname || ''; document.getElementById('student-email').value = data.email || ''; document.getElementById('add-student-modal').classList.remove('hidden'); } else { Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลนักเรียนที่ต้องการแก้ไข', 'error'); } }) .catch(err => { Swal.fire('ผิดพลาดโหลดข้อมูลนักเรียน', `ไม่สามารถโหลดข้อมูลนักเรียนเพื่อแก้ไข: ${err.message}`, 'error'); }); }
+  await waitForAuth(); const studentKey = event.target.dataset.key; database.ref(`students/${studentKey}`).once('value') .then(snapshot => { if (snapshot.exists()) { const data = snapshot.val(); document.getElementById('student-firebase-key-edit').value = studentKey; document.getElementById('student-id').value = data.studentId || ''; document.getElementById('student-room').value = data.room; document.getElementById('student-number').value = data.number; document.getElementById('student-name').value = data.name; document.getElementById('student-nickname').value = data.nickname || ''; document.getElementById('student-email').value = data.email || ''; const yearInput = document.getElementById('student-yearbe'); if (yearInput) { const numericYear = Number.isFinite(Number(data.yearBE)) ? Number(data.yearBE) : CURRENT_YEAR_BE; yearInput.value = numericYear; }
+      const semesters = normalizeStudentSemesters(data.semesters);
+      const semesterInputs = document.querySelectorAll('input[name="student-semesters"]');
+      if (semesterInputs && semesterInputs.length) {
+        semesterInputs.forEach(input => {
+          const semVal = Number(input.value);
+          input.checked = semesters.includes(semVal);
+        });
+        const hasChecked = Array.from(semesterInputs).some(input => input.checked);
+        if (!hasChecked) {
+          semesterInputs.forEach(input => { input.checked = Number(input.value) === CURRENT_SEMESTER; });
+        }
+      }
+      document.getElementById('add-student-modal').classList.remove('hidden'); } else { Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลนักเรียนที่ต้องการแก้ไข', 'error'); } }) .catch(err => { Swal.fire('ผิดพลาดโหลดข้อมูลนักเรียน', `ไม่สามารถโหลดข้อมูลนักเรียนเพื่อแก้ไข: ${err.message}`, 'error'); }); }
 async function handleDeleteStudent(event) {
   await waitForAuth(); const studentKey = event.target.dataset.key; const studentName = event.target.dataset.name || "ไม่ทราบชื่อ"; Swal.fire({ title: 'ยืนยันการลบ', text: `คุณต้องการลบข้อมูลนักเรียน "${studentName}" ใช่หรือไม่?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'ใช่, ลบข้อมูล', cancelButtonText: 'ยกเลิก' }).then(result => { if (result.isConfirmed) { database.ref(`students/${studentKey}`).remove().then(() => { Swal.fire('ลบสำเร็จ!', `ข้อมูลนักเรียน ${studentName} ถูกลบเรียบร้อยแล้ว`, 'success'); loadAllStudentsData(); }).catch(err => { Swal.fire('ผิดพลาดในการลบ', `ไม่สามารถลบข้อมูลนักเรียน: ${err.message}`, 'error'); }); } });}
 async function handleStudentHistoryModal(event) {
@@ -554,6 +833,12 @@ function closeStudentHistoryModal() {
   if (modal) {
     modal.classList.add('hidden');
   }
+  const downloadBtn = document.getElementById('download-student-history-csv');
+  if (downloadBtn) {
+    downloadBtn.classList.add('hidden');
+    downloadBtn.disabled = true;
+  }
+  latestStudentHistory = null;
 }
 async function openStudentHistoryModal(studentKey) {
   await waitForAuth();
@@ -567,6 +852,7 @@ async function openStudentHistoryModal(studentKey) {
   const overviewEl = document.getElementById('student-history-overview');
   const summaryEl = document.getElementById('student-history-summary');
   const tableBody = document.getElementById('student-history-table');
+  const downloadBtn = document.getElementById('download-student-history-csv');
 
   if (!loadingEl || !contentEl || !emptyEl || !nameEl || !overviewEl || !summaryEl || !tableBody) return;
 
@@ -574,6 +860,11 @@ async function openStudentHistoryModal(studentKey) {
   loadingEl.classList.remove('hidden');
   contentEl.classList.add('hidden');
   emptyEl.classList.add('hidden');
+  latestStudentHistory = null;
+  if (downloadBtn) {
+    downloadBtn.classList.add('hidden');
+    downloadBtn.disabled = true;
+  }
 
   try {
     const studentSnapshot = await database.ref(`students/${studentKey}`).once('value');
@@ -610,10 +901,15 @@ async function openStudentHistoryModal(studentKey) {
             const studentEntry = roomSnap.child(studentKey);
             if (studentEntry.exists()) {
               const entryData = studentEntry.val() || {};
+              const subjectName = getSubjectNameFromCode(subjectCode);
+              const subjectDisplay = subjectName && subjectName !== subjectCode
+                ? `${subjectName} (${subjectCode})`
+                : subjectCode;
               history.push({
                 date: dateKey,
                 subjectCode,
-                subjectName: getSubjectNameFromCode(subjectCode),
+                subjectName,
+                subjectDisplay,
                 room: roomKey,
                 status: entryData.status || 'ข',
                 remark: entryData.remark || ''
@@ -668,24 +964,46 @@ async function openStudentHistoryModal(studentKey) {
       </div>
     `).join('');
 
-    tableBody.innerHTML = history.map(entry => {
-      const subjectDisplay = entry.subjectName && entry.subjectName !== entry.subjectCode
-        ? `${entry.subjectName} (${entry.subjectCode})`
-        : entry.subjectCode;
-      return `
-        <tr>
-          <td class="py-2 px-3 border">${escapeHtml(entry.date)}</td>
-          <td class="py-2 px-3 border">${escapeHtml(subjectDisplay)}</td>
-          <td class="py-2 px-3 border">${escapeHtml(entry.room)}</td>
-          <td class="py-2 px-3 border">
-            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadgeClass(entry.status)}">${escapeHtml(getStatusLabel(entry.status))}</span>
-          </td>
-          <td class="py-2 px-3 border">${escapeHtml(entry.remark)}</td>
-        </tr>
-      `;
-    }).join('');
+    tableBody.innerHTML = history.map(entry => `
+      <tr>
+        <td class="py-2 px-3 border">${escapeHtml(entry.date)}</td>
+        <td class="py-2 px-3 border">${escapeHtml(entry.subjectDisplay || entry.subjectCode)}</td>
+        <td class="py-2 px-3 border">${escapeHtml(entry.room)}</td>
+        <td class="py-2 px-3 border">
+          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusBadgeClass(entry.status)}">${escapeHtml(getStatusLabel(entry.status))}</span>
+        </td>
+        <td class="py-2 px-3 border">${escapeHtml(entry.remark)}</td>
+      </tr>
+    `).join('');
 
     contentEl.classList.remove('hidden');
+    latestStudentHistory = {
+      studentKey,
+      studentName: studentNameText,
+      studentId: studentIdText,
+      room: studentData.room || '',
+      number: studentData.number || '',
+      yearBE: Number.isFinite(Number(studentData.yearBE)) ? Number(studentData.yearBE) : CURRENT_YEAR_BE,
+      semesters: normalizeStudentSemesters(studentData.semesters),
+      summaryItems: summaryItems.map(item => ({ label: item.label, value: item.value })),
+      history: history.map(entry => ({
+        date: entry.date,
+        subjectDisplay: entry.subjectDisplay || entry.subjectCode,
+        room: entry.room,
+        status: entry.status,
+        remark: entry.remark || ''
+      }))
+    };
+
+    if (downloadBtn) {
+      if (latestStudentHistory.history.length) {
+        downloadBtn.classList.remove('hidden');
+        downloadBtn.disabled = false;
+      } else {
+        downloadBtn.classList.add('hidden');
+        downloadBtn.disabled = true;
+      }
+    }
   } catch (error) {
     loadingEl.classList.add('hidden');
     closeStudentHistoryModal();
@@ -705,10 +1023,20 @@ async function populateRoomsFromStudents() {
     const snapshot = await database.ref('students').once('value');
     const roomSet = new Set();
     if (snapshot.exists()) {
+      const fallbackRooms = new Set();
       snapshot.forEach(child => {
         const v = child.val();
-        if (v && v.room) roomSet.add(String(v.room).trim());
+        if (v && v.room) {
+          const roomCode = String(v.room).trim();
+          if (studentMatchesTerm(v, selectedSemesterForAttendance, selectedYearForAttendance)) {
+            roomSet.add(roomCode);
+          }
+          fallbackRooms.add(roomCode);
+        }
       });
+      if (roomSet.size === 0) {
+        fallbackRooms.forEach(room => roomSet.add(room));
+      }
     }
     const rooms = Array.from(roomSet).sort();
     availableRoomsList = rooms;
@@ -878,6 +1206,7 @@ function handleAttendanceYearClick(year) {
   updateAttendanceRoomOptions();
   resetAttendanceStudentTable();
   checkEnableButtons();
+  updateGlobalTermDisplay();
 }
 
 function handleAttendanceSemesterClick(semester) {
@@ -891,6 +1220,7 @@ function handleAttendanceSemesterClick(semester) {
   updateAttendanceRoomOptions();
   resetAttendanceStudentTable();
   checkEnableButtons();
+  updateGlobalTermDisplay();
 }
 async function loadAndPopulateSubjects() {
   await waitForAuth();
@@ -1049,6 +1379,8 @@ async function loadAndPopulateSubjects() {
         }
       });
 
+      availableSubjectYears.add(CURRENT_YEAR_BE);
+
       setupSubjectAdminButtons();
       setupViewSubjectSummaryButtonsDynamic();
       if (!subjectSummaryCardsContainer.hasChildNodes()) {
@@ -1058,6 +1390,7 @@ async function loadAndPopulateSubjects() {
       renderAttendanceSemesterButtons();
       updateAttendanceSubjectOptions();
       updateAttendanceRoomOptions();
+      updateGlobalTermDisplay();
     } else {
       const noMsg = '<p class="text-gray-500 col-span-full">ไม่พบรายวิชา กรุณาเพิ่มรายวิชาใหม่</p>';
       subjectListAdmin.innerHTML = noMsg;
@@ -1065,11 +1398,13 @@ async function loadAndPopulateSubjects() {
       selectedYearForAttendance = null;
       selectedSubjectForAttendance = null;
       selectedRoomForAttendance = null;
+      availableSubjectYears.add(CURRENT_YEAR_BE);
       renderAttendanceYearButtons('ยังไม่มีข้อมูลปีการศึกษาให้เลือก');
       renderAttendanceSemesterButtons();
       updateAttendanceSubjectOptions();
       updateAttendanceRoomOptions();
       summarySubjectSelect.innerHTML = '<option value="">ไม่มีรายวิชา</option>';
+      updateGlobalTermDisplay();
     }
   } catch (error) {
     Swal.fire('ผิดพลาดโหลดรายวิชา', `ไม่สามารถโหลดข้อมูลรายวิชา: ${error.message}`, 'error');
@@ -1077,11 +1412,13 @@ async function loadAndPopulateSubjects() {
     subjectSummaryCardsContainer.innerHTML = '<p class="text-red-500 col-span-full">เกิดข้อผิดพลาดในการโหลดรายวิชา</p>';
     selectedSubjectForAttendance = null;
     selectedRoomForAttendance = null;
+    availableSubjectYears.add(CURRENT_YEAR_BE);
     renderAttendanceYearButtons('ไม่สามารถโหลดปีการศึกษาได้');
     renderAttendanceSemesterButtons();
     updateAttendanceSubjectOptions('เกิดข้อผิดพลาดในการโหลดรายวิชา');
     updateAttendanceRoomOptions('เกิดข้อผิดพลาดในการโหลดห้องเรียน');
     summarySubjectSelect.innerHTML = '<option value="">โหลดผิดพลาด</option>';
+    updateGlobalTermDisplay();
   }
 }
 function setupSubjectAdminButtons() { 
@@ -1145,11 +1482,11 @@ function handleResetAttendanceClick() {
 async function loadAllStudentsData() {
   await waitForAuth();
   const allStudentsList = document.getElementById('all-students-list');
-  allStudentsList.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-gray-500">กำลังโหลดข้อมูลนักเรียน...</td></tr>';
+  allStudentsList.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-gray-500">กำลังโหลดข้อมูลนักเรียน...</td></tr>';
   database.ref('students').orderByChild('room').once('value').then(snapshot => {
     allStudentsList.innerHTML = '';
     if (!snapshot.exists()) {
-      allStudentsList.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-gray-500">ไม่พบข้อมูลนักเรียน</td></tr>';
+      allStudentsList.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-gray-500">ไม่พบข้อมูลนักเรียน</td></tr>';
       return;
     }
 
@@ -1181,6 +1518,8 @@ async function loadAllStudentsData() {
       const displayName = s.name || 'N/A (ชื่อไม่ทราบ)';
       const displayNickname = s.nickname || '';
       const displayEmail = s.email || '';
+      const normalizedSemesters = normalizeStudentSemesters(s.semesters);
+      const displayTerm = `${describeStudentSemesters(normalizedSemesters)} / พ.ศ. ${Number.isFinite(Number(s.yearBE)) ? Number(s.yearBE) : CURRENT_YEAR_BE}`;
       const firebaseKey = s.firebaseKey || `error-key-${index}`;
       const row = allStudentsList.insertRow();
       row.setAttribute('data-student-firebase-key', firebaseKey);
@@ -1195,6 +1534,7 @@ async function loadAllStudentsData() {
         </td>
         <td class="py-2 px-4 border">${escapeHtml(displayNickname)}</td>
         <td class="py-2 px-4 border">${escapeHtml(displayEmail)}</td>
+        <td class="py-2 px-4 border">${escapeHtml(displayTerm)}</td>
         <td class="py-2 px-4 border text-center">-</td>
         <td class="py-2 px-4 border">
           <button class="edit-student-btn px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 mr-1" data-key="${escapeHtml(firebaseKey)}">แก้ไข</button>
@@ -1203,7 +1543,7 @@ async function loadAllStudentsData() {
     });
     setupStudentActionButtons();
   }).catch(err => {
-    allStudentsList.innerHTML = `<tr><td colspan="8" class="text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูลนักเรียน: ${err.message}</td></tr>`;
+    allStudentsList.innerHTML = `<tr><td colspan="9" class="text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูลนักเรียน: ${err.message}</td></tr>`;
   });
 }
 function setupStudentActionButtons() {
@@ -1478,12 +1818,23 @@ async function loadStudentsForAttendance(room) {
   try { 
     const studentsSnapshot = await database.ref('students').orderByChild('room').equalTo(room).once('value'); 
     if (!studentsSnapshot.exists()) { studentListBody.innerHTML = `<tr><td colspan="6" class="text-gray-500">ไม่พบนักเรียนในห้อง ${room}</td></tr>`; deleteButton.classList.add('hidden'); return; } 
-    const studentsData = studentsSnapshot.val(); const attendancePath = `attendance/${date}/${subjectCode}/${room}`; 
-    const attendanceSnapshot = await database.ref(attendancePath).once('value'); 
+    const studentsData = studentsSnapshot.val(); const attendancePath = `attendance/${date}/${subjectCode}/${room}`;
+    const attendanceSnapshot = await database.ref(attendancePath).once('value');
     const existingAttendance = attendanceSnapshot.val() || {};
-    studentListBody.innerHTML = ''; const studentsArray = Object.entries(studentsData).map(([key, value]) => ({ firebaseKey: key, ...value })); 
-    studentsArray.sort((a, b) => parseInt(a.number) - parseInt(b.number)); 
-    studentsArray.forEach(student => { const studentKey = student.firebaseKey; const studentDisplayId = student.studentId || studentKey; 
+    studentListBody.innerHTML = '';
+    const studentsArray = Object.entries(studentsData).map(([key, value]) => ({ firebaseKey: key, ...value }));
+    const targetSemester = selectedSemesterForAttendance;
+    const targetYear = selectedYearForAttendance;
+    const filteredStudents = studentsArray.filter(student => studentMatchesTerm(student, targetSemester, targetYear));
+
+    if (!filteredStudents.length) {
+      studentListBody.innerHTML = `<tr><td colspan="6" class="text-gray-500">ไม่พบนักเรียนในภาคเรียนที่เลือก</td></tr>`;
+      deleteButton.classList.add('hidden');
+      return;
+    }
+
+    filteredStudents.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+    filteredStudents.forEach(student => { const studentKey = student.firebaseKey; const studentDisplayId = student.studentId || studentKey;
       const currentStatus = existingAttendance[studentKey] ? existingAttendance[studentKey].status : null; 
       const currentRemark = existingAttendance[studentKey] ? (existingAttendance[studentKey].remark || '') : '';
       const row = studentListBody.insertRow(); row.setAttribute('data-firebase-key', studentKey); 
@@ -1560,13 +1911,18 @@ function setupActionButtons() {
   });
   document.getElementById('delete-day-attendance-btn').addEventListener('click', handleDeleteAttendanceForDate); 
   document.getElementById('view-summary').addEventListener('click', () => { if (selectedRoomForAttendance && selectedSubjectForAttendance) { document.getElementById('summary-room').value = selectedRoomForAttendance; document.getElementById('summary-subject').value = selectedSubjectForAttendance; document.getElementById('nav-summary').click(); document.getElementById('generate-summary').click(); } else { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกห้องและวิชาก่อน', 'warning'); } });
-  document.getElementById('generate-summary').addEventListener('click', generateAttendanceSummary); 
+  document.getElementById('generate-summary').addEventListener('click', generateAttendanceSummary);
+  const downloadSummaryBtn = document.getElementById('download-summary-csv');
+  if (downloadSummaryBtn) downloadSummaryBtn.addEventListener('click', handleDownloadSummaryCsv);
   document.getElementById('print-summary').addEventListener('click', () => window.print());
+  const downloadSubjectSummaryBtn = document.getElementById('download-subject-summary-csv');
+  if (downloadSubjectSummaryBtn) downloadSubjectSummaryBtn.addEventListener('click', handleDownloadSubjectSummaryCsv);
   document.getElementById('print-subject-summary').addEventListener('click', () => window.print());
 }
 
 async function generateAttendanceSummary() {
   await waitForAuth();
+  latestSummaryResult = null;
   const room = document.getElementById('summary-room').value;
   const subjectCode = document.getElementById('summary-subject').value;
   const startDateValue = document.getElementById('summary-start-date').value;
@@ -1592,9 +1948,19 @@ async function generateAttendanceSummary() {
       throw new Error(`ไม่พบนักเรียนในห้อง ${room}`);
     }
 
+    const targetSemester = (selectedSemesterForAttendance === 1 || selectedSemesterForAttendance === 2)
+      ? selectedSemesterForAttendance
+      : CURRENT_SEMESTER;
+    const targetYear = Number.isFinite(Number(selectedYearForAttendance))
+      ? Number(selectedYearForAttendance)
+      : CURRENT_YEAR_BE;
+
     const students = [];
     studentsSnapshot.forEach(child => {
       const data = child.val() || {};
+      if (!studentMatchesTerm(data, targetSemester, targetYear)) {
+        return;
+      }
       students.push({
         key: child.key,
         number: data.number || '',
@@ -1603,6 +1969,12 @@ async function generateAttendanceSummary() {
         nickname: data.nickname || ''
       });
     });
+    if (students.length === 0) {
+      summaryResultsEl.classList.add('hidden');
+      Swal.close();
+      Swal.fire('ไม่พบนักเรียน', 'ไม่มีนักเรียนในภาคเรียนที่เลือกสำหรับห้องนี้', 'info');
+      return;
+    }
     students.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
@@ -1818,11 +2190,70 @@ async function generateAttendanceSummary() {
 
     renderOverallAttendanceChart(summaries);
     renderDailyAttendanceChart(dailyStats);
+    const totalsByStatus = summaries.reduce((acc, summary) => {
+      acc.present += summary.counts.present;
+      acc.absent += summary.counts.absent;
+      acc.sick += summary.counts.sick;
+      acc.activity += summary.counts.activity;
+      acc.late += summary.counts.late;
+      return acc;
+    }, { present: 0, absent: 0, sick: 0, activity: 0, late: 0 });
+
+    latestSummaryResult = {
+      room,
+      subjectCode,
+      subjectName,
+      semester: targetSemester,
+      year: targetYear,
+      startDate: startDateValue,
+      endDate: endDateValue,
+      totalStudents: summaries.length,
+      totalDays: daysWithRecords,
+      averageAttendance,
+      maxEffectiveAbsent,
+      maxLate,
+      totalsByStatus,
+      studentSummaries: summaries.map(summary => ({
+        number: summary.number || '-',
+        studentId: summary.studentId || '-',
+        name: summary.name || '-',
+        present: summary.counts.present,
+        absent: summary.counts.absent,
+        sick: summary.counts.sick,
+        activity: summary.counts.activity,
+        late: summary.counts.late,
+        attendancePercent: formatPercent(summary.attendancePercent)
+      })),
+      lowAttendanceList: lowAttendanceList.map(item => ({
+        number: item.number,
+        name: item.name,
+        absentPercent: formatPercent(item.absentRatio * 100)
+      })),
+      frequentAbsencesList: frequentAbsencesList.map(item => ({
+        number: item.number,
+        name: item.name,
+        value: item.value
+      })),
+      frequentLatesList: frequentLatesList.map(item => ({
+        number: item.number,
+        name: item.name,
+        value: item.value
+      })),
+      dailyStats: dailyStats.map(stat => ({
+        date: stat.date,
+        attendancePercent: formatPercent(stat.attendancePercent),
+        present: stat.present,
+        excused: stat.excused,
+        absent: stat.absent,
+        late: stat.late
+      }))
+    };
     Swal.close();
   } catch (error) {
     summaryResultsEl.classList.add('hidden');
     Swal.close();
     Swal.fire('ผิดพลาด', `ไม่สามารถสร้างสรุปผลได้: ${error.message}`, 'error');
+    latestSummaryResult = null;
   }
 }
 
@@ -1972,6 +2403,7 @@ function renderAttendanceCalendarDisplay() {
 
 async function displaySubjectSummary(subjectCode, subjectName) {
   await waitForAuth();
+  latestSubjectSummary = null;
   if (!subjectCode) {
     Swal.fire('ข้อมูลไม่ครบ', 'ไม่สามารถโหลดสรุปรายวิชาได้ เนื่องจากไม่ทราบรหัสวิชา', 'warning');
     return;
@@ -2033,6 +2465,16 @@ async function displaySubjectSummary(subjectCode, subjectName) {
     renderSubjectOverallChart(totals);
     renderSubjectByRoomChart(roomArray);
 
+    const subjectMeta = allSubjectsData[subjectCode] || {};
+    latestSubjectSummary = {
+      subjectCode,
+      subjectName: subjectName || getSubjectNameFromCode(subjectCode),
+      semester: subjectMeta.semester || CURRENT_SEMESTER,
+      year: subjectMeta.yearBE || CURRENT_YEAR_BE,
+      totals,
+      roomStats: roomArray
+    };
+
     document.getElementById('subject-summary-content').classList.remove('hidden');
     document.getElementById('selected-subject-name-display').textContent = subjectName || getSubjectNameFromCode(subjectCode);
     document.getElementById('print-selected-subject-name').textContent = subjectName || getSubjectNameFromCode(subjectCode);
@@ -2040,6 +2482,7 @@ async function displaySubjectSummary(subjectCode, subjectName) {
   } catch (error) {
     Swal.close();
     Swal.fire('ผิดพลาด', `ไม่สามารถโหลดสรุปรายวิชาได้: ${error.message}`, 'error');
+    latestSubjectSummary = null;
   }
 }
 
@@ -2112,9 +2555,60 @@ function setupModalControls() {
   // Students
   const removeRoomBtn = document.getElementById('remove-room-students-btn');
   if (removeRoomBtn) removeRoomBtn.addEventListener('click', handleBulkRemoveStudents);
-  document.getElementById('add-student-btn').addEventListener('click', () => { document.getElementById('add-student-form').reset(); document.getElementById('student-firebase-key-edit').value = ''; document.getElementById('add-student-modal').classList.remove('hidden'); }); document.getElementById('cancel-add-student').addEventListener('click', () => document.getElementById('add-student-modal').classList.add('hidden'));
-  document.getElementById('add-student-form').addEventListener('submit', async (e) => {
-    await waitForAuth(); e.preventDefault(); const studentKey = document.getElementById('student-firebase-key-edit').value; const studentData = { studentId: document.getElementById('student-id').value.trim(), room: document.getElementById('student-room').value.trim(), number: document.getElementById('student-number').value.trim(), name: document.getElementById('student-name').value.trim(), nickname: document.getElementById('student-nickname').value.trim(), email: document.getElementById('student-email').value.trim() }; if (!studentData.studentId || !studentData.room || !studentData.number || !studentData.name) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่จำเป็น', 'warning'); return; } Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); let promise; if (studentKey) { promise = database.ref(`students/${studentKey}`).update(studentData); } else { const ref = database.ref('students').push(); studentData.firebaseKey = ref.key; promise = ref.set(studentData); } promise.then(() => { Swal.fire('สำเร็จ', `บันทึกข้อมูลนักเรียนแล้ว`, 'success'); document.getElementById('add-student-modal').classList.add('hidden'); loadAllStudentsData(); populateRoomsFromStudents(); }).catch(err => { Swal.fire('ผิดพลาด', `บันทึกไม่สำเร็จ: ${err.message}`, 'error'); }); });
+  document.getElementById('add-student-btn').addEventListener('click', () => { document.getElementById('add-student-form').reset(); document.getElementById('student-firebase-key-edit').value = ''; const yearInput = document.getElementById('student-yearbe'); if (yearInput) yearInput.value = CURRENT_YEAR_BE; const semesterInputs = document.querySelectorAll('input[name="student-semesters"]'); semesterInputs.forEach(input => { input.checked = Number(input.value) === CURRENT_SEMESTER; }); document.getElementById('add-student-modal').classList.remove('hidden'); }); document.getElementById('cancel-add-student').addEventListener('click', () => document.getElementById('add-student-modal').classList.add('hidden'));
+  const addStudentForm = document.getElementById('add-student-form');
+  if (addStudentForm) {
+    addStudentForm.addEventListener('submit', async (e) => {
+      await waitForAuth();
+      e.preventDefault();
+
+      const studentKey = document.getElementById('student-firebase-key-edit').value;
+      const yearRaw = Number(document.getElementById('student-yearbe').value);
+      const validYear = Number.isFinite(yearRaw) && yearRaw >= 2400 && yearRaw <= 3100 ? yearRaw : CURRENT_YEAR_BE;
+      const semestersSelected = Array.from(document.querySelectorAll('input[name="student-semesters"]:checked'))
+        .map(input => Number(input.value))
+        .filter(val => val === 1 || val === 2);
+      const semestersToSave = semestersSelected.length ? semestersSelected : [CURRENT_SEMESTER];
+
+      const studentData = {
+        studentId: document.getElementById('student-id').value.trim(),
+        room: document.getElementById('student-room').value.trim(),
+        number: document.getElementById('student-number').value.trim(),
+        name: document.getElementById('student-name').value.trim(),
+        nickname: document.getElementById('student-nickname').value.trim(),
+        email: document.getElementById('student-email').value.trim(),
+        yearBE: validYear,
+        semesters: semestersToSave
+      };
+
+      if (!studentData.studentId || !studentData.room || !studentData.number || !studentData.name) {
+        Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่จำเป็น', 'warning');
+        return;
+      }
+
+      Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      let promise;
+      if (studentKey) {
+        promise = database.ref(`students/${studentKey}`).update(studentData);
+      } else {
+        const ref = database.ref('students').push();
+        studentData.firebaseKey = ref.key;
+        promise = ref.set(studentData);
+      }
+
+      promise
+        .then(() => {
+          Swal.fire('สำเร็จ', `บันทึกข้อมูลนักเรียนแล้ว`, 'success');
+          document.getElementById('add-student-modal').classList.add('hidden');
+          loadAllStudentsData();
+          populateRoomsFromStudents();
+        })
+        .catch(err => {
+          Swal.fire('ผิดพลาด', `บันทึกไม่สำเร็จ: ${err.message}`, 'error');
+        });
+    });
+  }
 
   // Subjects
   document.getElementById('add-new-subject-btn').addEventListener('click', () => { document.getElementById('add-subject-form').reset(); document.getElementById('subject-firebase-key-edit').value = ''; document.getElementById('subject-semester').value = CURRENT_SEMESTER; document.getElementById('subject-yearbe').value  = CURRENT_YEAR_BE; document.getElementById('subject-rooms').value = ''; document.getElementById('add-subject-modal').classList.remove('hidden'); });
@@ -2176,6 +2670,8 @@ function setupModalControls() {
   document.getElementById('import-csv-btn').addEventListener('click', () => { document.getElementById('csv-file').value = ''; document.getElementById('csv-preview').classList.add('hidden'); document.getElementById('confirm-import-csv').disabled = true; document.getElementById('import-csv-modal').classList.remove('hidden'); }); document.getElementById('cancel-import-csv').addEventListener('click', () => document.getElementById('import-csv-modal').classList.add('hidden'));
   const closeHistoryBtn = document.getElementById('close-student-history');
   if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', closeStudentHistoryModal);
+  const downloadHistoryBtn = document.getElementById('download-student-history-csv');
+  if (downloadHistoryBtn) downloadHistoryBtn.addEventListener('click', handleDownloadStudentHistoryCsv);
   const studentHistoryModal = document.getElementById('student-history-modal');
   if (studentHistoryModal) {
     studentHistoryModal.addEventListener('click', (event) => {
@@ -2187,7 +2683,7 @@ function setupModalControls() {
 }
 
 // --- Search ---
-function setupStudentSearch() { document.getElementById('student-search').addEventListener('input', (e) => { const searchTerm = e.target.value.toLowerCase().trim(); const rows = document.querySelectorAll('#all-students-list tr'); rows.forEach(row => { const studentIdCol = row.cells[0]?.textContent.toLowerCase() || ''; const roomCol = row.cells[1]?.textContent.toLowerCase() || ''; const numberCol = row.cells[2]?.textContent.toLowerCase() || ''; const nameCol = row.cells[3]?.textContent.toLowerCase() || ''; const nicknameCol = row.cells[4]?.textContent.toLowerCase() || ''; const emailCol = row.cells[5]?.textContent.toLowerCase() || ''; if (studentIdCol.includes(searchTerm) || roomCol.includes(searchTerm) || numberCol.includes(searchTerm) || nameCol.includes(searchTerm) || nicknameCol.includes(searchTerm) || emailCol.includes(searchTerm)) { row.style.display = ''; } else { row.style.display = 'none'; } }); });}
+function setupStudentSearch() { document.getElementById('student-search').addEventListener('input', (e) => { const searchTerm = e.target.value.toLowerCase().trim(); const rows = document.querySelectorAll('#all-students-list tr'); rows.forEach(row => { const studentIdCol = row.cells[0]?.textContent.toLowerCase() || ''; const roomCol = row.cells[1]?.textContent.toLowerCase() || ''; const numberCol = row.cells[2]?.textContent.toLowerCase() || ''; const nameCol = row.cells[3]?.textContent.toLowerCase() || ''; const nicknameCol = row.cells[4]?.textContent.toLowerCase() || ''; const emailCol = row.cells[5]?.textContent.toLowerCase() || ''; const termCol = row.cells[6]?.textContent.toLowerCase() || ''; if (studentIdCol.includes(searchTerm) || roomCol.includes(searchTerm) || numberCol.includes(searchTerm) || nameCol.includes(searchTerm) || nicknameCol.includes(searchTerm) || emailCol.includes(searchTerm) || termCol.includes(searchTerm)) { row.style.display = ''; } else { row.style.display = 'none'; } }); });}
 
 // --- Summary/Charts/Calendar ---
 // (คงฟังก์ชัน generateAttendanceSummary, renderOverallAttendanceChart, renderDailyAttendanceChart,
@@ -2196,8 +2692,11 @@ function setupStudentSearch() { document.getElementById('student-search').addEve
 
 // --- Bootstrap app ---
 window.attendanceChartInstance = null; window.dailyChartInstance = null; window.subjectAttendanceChartInstance = null; window.subjectClassChartInstance = null;
-let currentCalendarDate = new Date(); 
-let calendarActiveDates = []; 
+let currentCalendarDate = new Date();
+let calendarActiveDates = [];
+let latestSummaryResult = null;
+let latestSubjectSummary = null;
+let latestStudentHistory = null;
 
 document.addEventListener('DOMContentLoaded', async function () {
   console.log('DOM loaded. Waiting for Firebase auth...');
@@ -2210,6 +2709,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   setupModalControls();
   setupStudentSearch();
   setupCalendarControls?.();
+  updateGlobalTermDisplay();
   const attendanceDateInput = document.getElementById('attendance-date');
   if (attendanceDateInput) {
     attendanceDateInput.value = formatDateISO(new Date());
